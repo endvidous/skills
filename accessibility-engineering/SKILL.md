@@ -1,6 +1,6 @@
 ---
 name: accessibility-engineering
-description: Use when building or reviewing any UI for accessibility — components, forms, modals, navigation, custom widgets, focus management, keyboard support, ARIA usage, color contrast, screen-reader behavior, or WCAG/EAA/ADA compliance questions. The engineering layer: semantic HTML, keyboard/focus mechanics, ARIA rules, and testing; visual-design skills handle aesthetics. Fires especially on custom interactive components (dropdowns, dialogs, tabs, comboboxes) and SPA route changes.
+description: "Use when building or reviewing any UI for accessibility — components, forms, modals, navigation, custom widgets, focus management, keyboard support, ARIA usage, color contrast, screen-reader behavior, or WCAG/EAA/ADA compliance questions. The engineering layer: semantic HTML, keyboard/focus mechanics, ARIA rules, and testing; visual-design skills handle aesthetics. Fires especially on custom interactive components (dropdowns, dialogs, tabs, comboboxes) and SPA route changes."
 ---
 
 # Accessibility Engineering
@@ -11,13 +11,13 @@ The compliance floor is **WCAG 2.2 AA** — it's the reference for the European 
 
 - `<button>` for actions, `<a href>` for navigation, `<label>` wired to every input, `<select>`/`<input type=...>` before custom widgets, one `<h1>` and a heading hierarchy that doesn't skip levels, landmarks (`<nav>`, `<main>`, `<header>`) for orientation.
 - A `<div onClick>` is not a button: it's missing keyboard activation (Enter/Space), focusability, the accessible role, and announced state — four bugs in one element.
-- Reach for a custom widget only when a native element genuinely can't do the job — and then build it to the [ARIA Authoring Practices Guide](https://www.w3.org/WAI/ARIA/apg/patterns/) pattern (roles + expected *keyboard interaction*, which is the part everyone skips) or, better, use a headless accessible library (Radix/React Aria/Headless UI-class) that has already shipped the keyboard contract.
+- Reach for a custom widget only when a native element genuinely can't do the job — and then build it to the [ARIA Authoring Practices Guide](https://www.w3.org/WAI/ARIA/apg/patterns/) pattern (roles + expected _keyboard interaction_, which is the part everyone skips) or, better, use a headless accessible library (Radix/React Aria/Headless UI-class) that has already shipped the keyboard contract.
 
 ## Decision 2: ARIA — less is more, verifiably
 
-The [first rule of ARIA](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA): don't use ARIA if native HTML can do it. This isn't style preference — pages *with* ARIA average significantly **more** detectable errors than pages without (59.1 vs 42 per page in the [2026 WebAIM Million](https://webaim.org/projects/million/)); bad ARIA actively lies to screen readers, which is worse than silence.
+The [first rule of ARIA](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA): don't use ARIA if native HTML can do it. This isn't style preference — pages _with_ ARIA average significantly **more** detectable errors than pages without (59.1 vs 42 per page in the [2026 WebAIM Million](https://webaim.org/projects/million/)); bad ARIA actively lies to screen readers, which is worse than silence.
 
-- ARIA changes *announcements*, never *behavior* — `role="button"` doesn't add keyboard handling; you still owe the JS.
+- ARIA changes _announcements_, never _behavior_ — `role="button"` doesn't add keyboard handling; you still owe the JS.
 - Legitimate uses: state on custom widgets (`aria-expanded`, `aria-selected`, `aria-current`), `aria-label` where visible text is absent (icon buttons), `aria-describedby` for error/help association, `aria-live` for async announcements.
 - `aria-live="polite"` regions for toast/status updates; sparse — a chatty live region is unusable. Form-submit results, background-job completion, and route changes (Decision 3) are the standard cases.
 
@@ -26,6 +26,7 @@ The [first rule of ARIA](https://developer.mozilla.org/en-US/docs/Web/Accessibil
 Everything a mouse can do, the keyboard must: reachable (Tab), operable (Enter/Space/arrows per APG pattern), escapable (no traps), in a **visible focus indicator** (never `outline: none` without a replacement; WCAG 2.2 adds [Focus Not Obscured](https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/) — sticky headers/footers must not hide the focused element).
 
 Focus is **managed state** in an SPA (`frontend-architecture`):
+
 - **Route change:** nothing happens by default — move focus to the new page's heading/main and announce the navigation (live region or focus target); otherwise a screen-reader user "clicks" and hears nothing.
 - **Modal open:** focus moves in, Tab is trapped inside, Escape closes, focus **returns to the trigger** on close. Native `<dialog>` handles most of this — use it.
 - **Deletion/collapse:** focus moves to a sensible neighbor, never dropped to `<body>`.
@@ -34,7 +35,7 @@ Focus is **managed state** in an SPA (`frontend-architecture`):
 ## Decision 4: Forms and errors
 
 - Every input has a real `<label>` (placeholder is not a label — it vanishes on input and fails contrast); groups use `<fieldset>`/`<legend>`; correct `type=` and `autocomplete=` (mobile keyboards + WCAG 1.3.5).
-- Errors: identified in *text* (not color alone), associated via `aria-describedby` + `aria-invalid`, and on failed submit focus moves to the first invalid field or an error summary that links to fields.
+- Errors: identified in _text_ (not color alone), associated via `aria-describedby` + `aria-invalid`, and on failed submit focus moves to the first invalid field or an error summary that links to fields.
 - WCAG 2.2 additions worth designing in: **Target Size** ≥24×24 CSS px for pointer targets, **Redundant Entry** (don't re-ask within a flow), **Accessible Authentication** (no cognitive tests — copy-paste allowed in password fields, no "type the 3rd character") ([new in 2.2](https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/)).
 
 ## Decision 5: The visual floor (engineering side)
