@@ -1,6 +1,6 @@
 ---
 name: migration-playbooks
-description: Use when planning or reviewing any migration — replacing a legacy system, swapping a datastore/provider/library, moving traffic to a new implementation, large refactors of live code paths, or any change where old and new must coexist. Covers strangler fig, branch by abstraction, dual-write/dual-read sequencing, shadow-traffic verification (Scientist pattern), feature-flag discipline, and rollback design. Complements data-modeling's expand/contract for schema-level changes.
+description: Use when planning or reviewing any migration — replacing a legacy system, swapping a datastore/provider/library, moving traffic to a new implementation, large refactors of live code paths, or any change where old and new must coexist. Complements data-modeling's expand/contract for schema-level changes.
 ---
 
 # Migration Playbooks
@@ -11,10 +11,10 @@ The law of live-system migration: **there is no big bang.** Every safe migration
 
 | Change | Pattern | Mechanics |
 |---|---|---|
-| Schema/API shape change | **Expand/contract** | Add new alongside old → migrate consumers → remove old. Fully specified in `data-modeling` (schemas) and `api-contracts` (breaking changes); root pattern: [Fowler, ParallelChange](https://martinfowler.com/bliki/ParallelChange.html) |
-| Replacing a system/service incrementally | **Strangler fig** | A façade/router in front of the legacy system sends each capability to old or new; functionality moves piece by piece; legacy keeps running throughout ([Fowler, StranglerFigApplication](https://martinfowler.com/bliki/StranglerFigApplication.html)) |
-| Large in-codebase change without a long-lived branch | **Branch by abstraction** | Introduce an abstraction over the old implementation → build the new behind it → flip callers incrementally on trunk → delete old + (usually) the abstraction ([Fowler, BranchByAbstraction](https://martinfowler.com/bliki/BranchByAbstraction.html)) |
-| Verifying a rewrite of a critical read path | **Shadow execution (Scientist pattern)** | Run old (control) and new (candidate) on real production traffic; *return the control result*; record mismatches. GitHub built [Scientist](https://github.com/github/scientist) for exactly this — multi-year permission-code rewrites verified on live traffic before any user saw the new path |
+| Schema/API shape change | **Expand/contract** | Add new alongside old → migrate consumers → remove old. Fully specified in `data-modeling` (schemas) and `api-contracts` (breaking changes); root pattern: Fowler, ParallelChange |
+| Replacing a system/service incrementally | **Strangler fig** | A façade/router in front of the legacy system sends each capability to old or new; functionality moves piece by piece; legacy keeps running throughout (Fowler, StranglerFigApplication) |
+| Large in-codebase change without a long-lived branch | **Branch by abstraction** | Introduce an abstraction over the old implementation → build the new behind it → flip callers incrementally on trunk → delete old + (usually) the abstraction (Fowler, BranchByAbstraction) |
+| Verifying a rewrite of a critical read path | **Shadow execution (Scientist pattern)** | Run old (control) and new (candidate) on real production traffic; *return the control result*; record mismatches. GitHub built Scientist for exactly this — multi-year permission-code rewrites verified on live traffic before any user saw the new path |
 
 **Strangler-fig warnings** from the field: the interception point must exist or be buildable (a façade you can actually route through); old domain boundaries rarely map 1:1 to the new design — budget interface redesign; and the pattern's known failure mode is **never finishing** — "no pressure to finish" leaves you maintaining both systems forever. Every strangler plan needs a funded final step and a decommission date someone owns.
 
@@ -36,7 +36,7 @@ Skipping step 4 or rushing step 6 is how "successful" migrations surface corrupt
 
 ## Decision 3: Feature-flag discipline
 
-Flags are the routing mechanism for most migration steps. [Hodgson's taxonomy](https://martinfowler.com/articles/feature-toggles.html) matters because each category has different lifetime and dynamism — managing them identically is how flag debt accrues:
+Flags are the routing mechanism for most migration steps. Hodgson's taxonomy matters because each category has different lifetime and dynamism — managing them identically is how flag debt accrues:
 
 | Category | Purpose | Lifetime |
 |---|---|---|
@@ -75,11 +75,3 @@ Rules: every release flag has a removal ticket created at creation (a "temporary
 - Destructive cleanup in the same deploy as the cutover
 - Flag graveyard: release flags aging into de-facto (untested) architecture
 - Declaring victory at 100% traffic — the migration ends at *decommission*, not cutover
-
-## Sources
-
-- [StranglerFigApplication — Martin Fowler](https://martinfowler.com/bliki/StranglerFigApplication.html) · [Strangler Fig — Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/patterns/strangler-fig)
-- [BranchByAbstraction — Martin Fowler](https://martinfowler.com/bliki/BranchByAbstraction.html)
-- [ParallelChange (expand/contract) — Martin Fowler](https://martinfowler.com/bliki/ParallelChange.html)
-- [Scientist: refactoring critical paths with live verification — GitHub](https://github.com/github/scientist) · [InfoQ writeup](https://www.infoq.com/news/2016/02/github-scientist-refactoring/)
-- [Feature Toggles — Pete Hodgson on martinfowler.com](https://martinfowler.com/articles/feature-toggles.html)

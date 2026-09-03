@@ -1,26 +1,26 @@
 ---
 name: service-boundaries
-description: Use when deciding whether to split a service, extract a microservice, restructure a monolith, define module/domain boundaries, or review a proposal that adds a new service, queue-connected worker, or repo. Covers monolith-first reasoning, bounded contexts, Conway's law, the legitimate split triggers, modular-monolith discipline, and inter-service coupling rules. Also fires when someone says "we should move to microservices."
+description: Use when deciding whether to split a service, extract a microservice, restructure a monolith, define module/domain boundaries, or review a proposal that adds a new service, queue-connected worker, or repo. Also fires when someone says "we should move to microservices."
 ---
 
 # Service Boundaries
 
-The evidence is one-directional: "almost all the successful microservice stories have started with a monolith that got too big and was broken up; almost all the cases where a system was built as a microservice system from scratch have ended up in serious trouble" ([Fowler: MonolithFirst](https://martinfowler.com/bliki/MonolithFirst.html)). Services are a tool for scaling *organizations*, paid for with a distributed-systems tax on every call. Default to not splitting.
+The evidence is one-directional: "almost all the successful microservice stories have started with a monolith that got too big and was broken up; almost all the cases where a system was built as a microservice system from scratch have ended up in serious trouble" (Fowler: MonolithFirst). Services are a tool for scaling *organizations*, paid for with a distributed-systems tax on every call. Default to not splitting.
 
 ## Decision 1: Monolith vs services
 
 - **Modular monolith (default)** — one deployable, strictly separated internal modules. You keep transactions, in-process calls, one deploy, one debugger — and you keep the *option* to split later along boundaries that reality has validated.
-- **Microservices** — pay the "microservice premium" (distributed failure modes, eventual consistency, deploy orchestration, observability overhead) only when system + team complexity genuinely demands it ([Fowler: MicroservicePremium](https://martinfowler.com/bliki/MicroservicePremium.html)).
+- **Microservices** — pay the "microservice premium" (distributed failure modes, eventual consistency, deploy orchestration, observability overhead) only when system + team complexity genuinely demands it (Fowler: MicroservicePremium).
 
-The cautionary cases are well documented: Segment collapsed 140+ destination services back into a monolith after operational overhead scaled linearly with services and three full-time engineers were consumed just keeping the system alive ([Goodbye Microservices — Twilio Segment](https://www.twilio.com/en-us/blog/developers/best-practices/goodbye-microservices)); Amazon Prime Video's monitoring team merged its serverless microservices into a monolith and cut infrastructure cost by over 90% ([The New Stack coverage](https://thenewstack.io/return-of-the-monolith-amazon-dumps-microservices-for-video-monitoring/)). Neither means "monoliths always win" — both mean the split must be justified by measurements, not fashion.
+The cautionary cases are well documented: Segment collapsed 140+ destination services back into a monolith after operational overhead scaled linearly with services and three full-time engineers were consumed just keeping the system alive (Goodbye Microservices — Twilio Segment); Amazon Prime Video's monitoring team merged its serverless microservices into a monolith and cut infrastructure cost by over 90% (The New Stack coverage). Neither means "monoliths always win" — both mean the split must be justified by measurements, not fashion.
 
 Why splitting early fails specifically: "even experienced architects working in familiar domains have great difficulty getting boundaries right at the beginning" (Fowler). Refactoring a boundary between modules is an afternoon; between services it's a distributed migration.
 
 ## Decision 2: Where boundaries go
 
-- **Bounded contexts, not technical layers.** A boundary encloses a business capability with its own consistent language and model — orders, billing, identity — never "the API layer" / "the data layer" ([Fowler: BoundedContext](https://martinfowler.com/bliki/BoundedContext.html)). Horizontal (layer) services guarantee every feature touches every service.
+- **Bounded contexts, not technical layers.** A boundary encloses a business capability with its own consistent language and model — orders, billing, identity — never "the API layer" / "the data layer" (Fowler: BoundedContext). Horizontal (layer) services guarantee every feature touches every service.
 - **Test:** if a routine feature regularly requires coordinated changes on both sides of a boundary, the boundary is wrong — cohesion belongs inside, coupling across is the failure signal.
-- **Conway's law is load-bearing:** system structure mirrors communication structure ([Fowler: ConwaysLaw](https://martinfowler.com/bliki/ConwaysLaw.html)). A service without a clear owning team becomes an orphan; two teams inside one service fight over it. Align boundaries with team ownership deliberately (the "inverse Conway maneuver") — or accept that the org chart will redraw your architecture for you.
+- **Conway's law is load-bearing:** system structure mirrors communication structure (Fowler: ConwaysLaw). A service without a clear owning team becomes an orphan; two teams inside one service fight over it. Align boundaries with team ownership deliberately (the "inverse Conway maneuver") — or accept that the org chart will redraw your architecture for you.
 - **Data draws the real boundary:** each context owns its data exclusively. If two candidate services need to transact over the same rows, they're one service.
 
 ## Decision 3: When a split is actually justified
@@ -66,11 +66,3 @@ The monolith-first strategy only works if the monolith stays modular:
 - Entity services ("UserService" that every feature must call synchronously)
 - Distributed monolith: N repos, one lockstep release train
 - Splitting to "keep the code clean" — discipline problems follow you across the network, with worse tooling
-
-## Sources
-
-- [MonolithFirst — Martin Fowler](https://martinfowler.com/bliki/MonolithFirst.html) · [MicroservicePremium](https://martinfowler.com/bliki/MicroservicePremium.html)
-- [BoundedContext — Martin Fowler](https://martinfowler.com/bliki/BoundedContext.html) · [ConwaysLaw](https://martinfowler.com/bliki/ConwaysLaw.html)
-- [Goodbye Microservices — Twilio Segment](https://www.twilio.com/en-us/blog/developers/best-practices/goodbye-microservices) · [InfoQ analysis](https://www.infoq.com/news/2020/04/microservices-back-again/)
-- [Prime Video monitoring: microservices → monolith, −90% cost — The New Stack](https://thenewstack.io/return-of-the-monolith-amazon-dumps-microservices-for-video-monitoring/)
-- [Domain analysis for service boundaries — Azure Architecture Center](https://learn.microsoft.com/en-us/azure/architecture/microservices/model/domain-analysis)

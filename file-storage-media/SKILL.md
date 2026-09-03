@@ -1,6 +1,6 @@
 ---
 name: file-storage-media
-description: Use when designing or reviewing file upload/download features, object storage usage (S3/GCS/R2), presigned URLs, user-generated media (images, video, documents), export/report generation, file processing pipelines, or storage lifecycle/retention. Covers direct-to-storage upload flows, the file metadata table, serving strategies, processing pipelines, and lifecycle cost control. Complements security-boundaries (upload validation) and distributed-reliability (async processing).
+description: Use when designing or reviewing file upload/download features, object storage usage (S3/GCS/R2), presigned URLs, user-generated media (images, video, documents), export/report generation, file processing pipelines, or storage lifecycle/retention. Complements security-boundaries (upload validation) and distributed-reliability (async processing).
 ---
 
 # File Storage & Media
@@ -20,7 +20,7 @@ The standard sequence:
 3. Client uploads directly to storage.
 4. Completion is confirmed server-side — a confirm call that verifies the object exists (HEAD) or a storage-event notification — and the row moves `pending → uploaded`. **Never trust the client's "done."**
 
-Presigned URLs are bearer tokens: short expiry, HTTPS only, never logged (`security-boundaries` secrets rules). Files >~100MB use **multipart** (parallel parts, resumable) — and every bucket gets a lifecycle rule to **abort incomplete multipart uploads** after ~7 days, because abandoned parts bill invisibly forever ([AWS: abort-incomplete-MPU lifecycle](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-abort-incomplete-mpu-lifecycle-config.html)).
+Presigned URLs are bearer tokens: short expiry, HTTPS only, never logged (`security-boundaries` secrets rules). Files >~100MB use **multipart** (parallel parts, resumable) — and every bucket gets a lifecycle rule to **abort incomplete multipart uploads** after ~7 days, because abandoned parts bill invisibly forever.
 
 Validate after upload, before use: type by **magic bytes** (not extension, not client Content-Type), size against policy, malware scan where the threat model warrants; images get re-encoded (strips EXIF/GPS and most polyglot-file attacks) — the `security-boundaries` upload rules, applied at the `uploaded → ready` transition.
 
@@ -75,10 +75,3 @@ Storage grows monotonically unless you decide otherwise, and the bill is storage
 - Thumbnailing in the request handler; non-idempotent processing jobs
 - Pre-generating every conceivable image size instead of transforming on demand
 - Discovering egress pricing from the first big invoice
-
-## Sources
-
-- [Amazon S3: presigned URLs](https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-presigned-url.html) · [POST policy conditions](https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-HTTPPOSTConstructPolicy.html)
-- [S3 lifecycle rule to abort incomplete multipart uploads — AWS](https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpu-abort-incomplete-mpu-lifecycle-config.html) · [Aborting multipart uploads](https://docs.aws.amazon.com/AmazonS3/latest/userguide/abort-mpu.html)
-- [Multipart + presigned upload patterns](https://brightinventions.pl/blog/improving-s3-large-files-uploads/) · [Multipart with presigned URLs walkthrough](https://articles.wesionary.team/introduction-to-aws-s3-uploads-and-multipart-uploads-using-presigned-urls-c80c86a1f803)
-- [OWASP File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html)

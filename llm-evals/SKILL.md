@@ -1,21 +1,21 @@
 ---
 name: llm-evals
-description: Use when building, shipping, or changing any LLM-powered feature — before changing a prompt, swapping a model, or adding an AI capability — and whenever someone asks "is the AI output good?" or reports quality regressions. Covers eval-first development, error analysis, code assertions vs LLM-as-judge vs human review, judge bias mitigation, golden datasets, regression harnesses in CI, and agent/trajectory evaluation.
+description: Use when building, shipping, or changing any LLM-powered feature — before changing a prompt, swapping a model, or adding an AI capability — and whenever someone asks "is the AI output good?" or reports quality regressions.
 ---
 
 # LLM Evals
 
-Unsuccessful AI products almost always share a root cause: no robust evaluation system ([Hamel Husain: Your AI Product Needs Evals](https://hamel.dev/blog/posts/evals/)). Without evals, every prompt tweak and model swap is a blind bet — you cannot know whether you improved the product or broke it for a case you're not looking at. The eval suite is to an LLM feature what the test suite is to code: the thing that makes change safe.
+Unsuccessful AI products almost always share a root cause: no robust evaluation system (Hamel Husain: Your AI Product Needs Evals). Without evals, every prompt tweak and model swap is a blind bet — you cannot know whether you improved the product or broke it for a case you're not looking at. The eval suite is to an LLM feature what the test suite is to code: the thing that makes change safe.
 
 ## Decision 1: When to invest in evals
 
 **Before the feature ships, and before any prompt/model change after that.** The eval-first loop: collect real examples → label what "good" means → automate the check → then iterate on prompts/models against it. Iterating on prompts before having evals is optimizing against your own memory of three examples.
 
-**Start with error analysis, not metrics.** Read your actual traces — 30–50 of them — and categorize the failures before choosing what to measure. The failure taxonomy tells you which evals are worth building; a metric chosen before looking at data measures the wrong thing precisely (the core method Husain/Shankar teach: [look at your data first](https://hamel.dev/blog/posts/evals-faq/)).
+**Start with error analysis, not metrics.** Read your actual traces — 30–50 of them — and categorize the failures before choosing what to measure. The failure taxonomy tells you which evals are worth building; a metric chosen before looking at data measures the wrong thing precisely (the core method Husain/Shankar teach: look at your data first).
 
 ## Decision 2: What kind of check, per failure mode
 
-Three levels, cheapest first — use the cheapest level that can detect the failure ([Husain's three levels](https://hamel.dev/blog/posts/evals/)):
+Three levels, cheapest first — use the cheapest level that can detect the failure (Husain's three levels):
 
 1. **Code assertions (default wherever possible)** — deterministic checks, run like unit tests: output parses against the schema, required fields present, no PII/user-ID leakage, banned phrases absent, citations point at retrieved chunks, length bounds, refusal-when-required. Cheap, fast, zero judge noise. A surprising fraction of "quality" failures reduce to assertions.
 2. **LLM-as-judge** — for genuinely subjective criteria (faithfulness, tone, helpfulness). Powerful but a measurement instrument that itself needs calibration — see Decision 4.
@@ -32,7 +32,7 @@ Retrieval systems get a separate, fully deterministic eval: recall@k / precision
 
 ## Decision 4: Judge design (LLM-as-judge done properly)
 
-A strong LLM judge can match human agreement (~80%+, the same level as human–human agreement), but carries known, measured biases ([Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena"](https://arxiv.org/abs/2306.05685)):
+A strong LLM judge can match human agreement (~80%+, the same level as human–human agreement), but carries known, measured biases (Zheng et al., "Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena", NeurIPS 2023):
 
 | Bias | Mitigation |
 |---|---|
@@ -40,7 +40,7 @@ A strong LLM judge can match human agreement (~80%+, the same level as human–h
 | **Verbosity bias** (prefers longer answers regardless of quality) | Judge per-criterion against a rubric, not holistic "which is better"; include length-matched counterexamples in judge validation |
 | **Self-enhancement bias** (favors its own model family's outputs) | Judge with a different model than the generator, or validate the judge against human labels before trusting it |
 
-Hard rules ([Husain's judge guide](https://hamel.dev/blog/posts/llm-judge/index.html)):
+Hard rules (Husain's judge guide):
 - **Binary pass/fail per criterion, never 1–10 scores.** A "helpfulness of 4.2 vs 4.7" is meaningless and unactionable; "faithful-to-source: fail" is a bug report.
 - **One criterion per judge prompt** — an omnibus judge blurs everything into vibes. Faithfulness, completeness, and tone are separate judges.
 - **Critique before verdict** — require the judge to quote the evidence, then decide.
@@ -63,7 +63,7 @@ Single-response evals don't transfer directly to agents:
 
 ## Online evaluation (production)
 
-The offline suite is necessary, not sufficient. In production: capture thumbs/edit-rate/abandonment as weak labels; sample traces for scheduled human review; feed every confirmed failure back into the dataset (the flywheel — [Eugene Yan's patterns](https://eugeneyan.com/writing/llm-patterns/)). A/B test major changes on real traffic when the offline delta is small — offline evals rank variants, production decides.
+The offline suite is necessary, not sufficient. In production: capture thumbs/edit-rate/abandonment as weak labels; sample traces for scheduled human review; feed every confirmed failure back into the dataset (the flywheel — Eugene Yan's patterns). A/B test major changes on real traffic when the offline delta is small — offline evals rank variants, production decides.
 
 ## Review checklist
 
@@ -86,10 +86,3 @@ The offline suite is necessary, not sufficient. In production: capture thumbs/ed
 - Evals run once at launch, never on subsequent prompt edits
 - Debugging generation while retrieval is unmeasured
 - Treating the judge's verdict as ground truth instead of a calibrated instrument
-
-## Sources
-
-- [Your AI Product Needs Evals — Hamel Husain](https://hamel.dev/blog/posts/evals/) · [LLM judge guide](https://hamel.dev/blog/posts/llm-judge/index.html) · [Evals FAQ](https://hamel.dev/blog/posts/evals-faq/)
-- [Judging LLM-as-a-Judge with MT-Bench and Chatbot Arena — Zheng et al., NeurIPS 2023](https://arxiv.org/abs/2306.05685)
-- [Patterns for Building LLM-based Systems & Products — Eugene Yan](https://eugeneyan.com/writing/llm-patterns/)
-- [LLM-as-a-judge complete guide — Evidently AI](https://www.evidentlyai.com/llm-guide/llm-as-a-judge)

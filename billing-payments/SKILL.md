@@ -1,22 +1,22 @@
 ---
 name: billing-payments
-description: Use when building or reviewing anything that touches money or plans — payment provider integration (Stripe et al.), subscriptions, checkout, plan changes, proration, entitlements/feature gating, usage-based/metered billing, invoices, failed payments/dunning, refunds, or billing webhooks. Covers the provider-as-source-of-truth rule, webhook reconciliation, the entitlement layer, subscription state machines, and dunning. Complements api-contracts (webhook mechanics, idempotency) and distributed-reliability.
+description: Use when building or reviewing anything that touches money or plans — payment provider integration (Stripe et al.), subscriptions, checkout, plan changes, proration, entitlements/feature gating, usage-based/metered billing, invoices, failed payments/dunning, refunds, or billing webhooks. Complements api-contracts (webhook mechanics, idempotency) and distributed-reliability.
 ---
 
 # Billing & Payments
 
-Two rules generate most of this file. **One:** never store, log, or transit raw card data — use the provider's hosted fields/checkout so card numbers never touch your servers, which keeps you in the lightest PCI compliance tier (SAQ-A) instead of a real audit ([Stripe PCI guide](https://stripe.com/guides/pci-compliance)). **Two:** for everything the provider manages (subscriptions, payment state), **the provider is the source of truth and your database is a projection of it** — billing bugs are almost always a projection that drifted, and the fix is reconciliation, not cleverer event handling.
+Two rules generate most of this file. **One:** never store, log, or transit raw card data — use the provider's hosted fields/checkout so card numbers never touch your servers, which keeps you in the lightest PCI compliance tier (SAQ-A) instead of a real audit. **Two:** for everything the provider manages (subscriptions, payment state), **the provider is the source of truth and your database is a projection of it** — billing bugs are almost always a projection that drifted, and the fix is reconciliation, not cleverer event handling.
 
 ## Decision 1: Integration surface
 
 - **Hosted checkout (Stripe Checkout-class) — default.** Provider hosts the payment page; you get SAQ-A PCI scope, built-in SCA/3DS, wallets, tax hooks. Cost: less UI control. Start here; the conversion argument for custom checkout is rarely backed by your data.
-- **Embedded fields (Elements-class)** — custom UI, card data still goes direct to the provider. Note the compliance step-up: fully custom forms with embedded fields can land in SAQ A-EP, which has real web-security requirements ([SAQ scope differences](https://cside.com/blog/can-you-use-stripe-for-pci-dss)).
+- **Embedded fields (Elements-class)** — custom UI, card data still goes direct to the provider. Note the compliance step-up: fully custom forms with embedded fields can land in SAQ A-EP, which has real web-security requirements.
 - **Your own card handling** — no. That's full PCI DSS; it's a business decision with an auditor, not an engineering choice.
 - Multi-provider abstraction layers are speculative until you have a signed reason (a market your provider doesn't serve). One provider, used deeply, beats an adapter over two used shallowly.
 
 ## Decision 2: Webhook-driven projection — the core loop
 
-Your handler pattern for every billing event ([Stripe webhook docs](https://docs.stripe.com/webhooks), [subscription webhooks](https://docs.stripe.com/billing/subscriptions/webhooks)):
+Your handler pattern for every billing event:
 
 1. **Verify the signature** on the raw body (`api-contracts` webhook rules), ack `200` fast, process async — the provider's timeout is ~10s and slow handlers cause retry double-processing.
 2. **Dedupe by event ID** — delivery is at-least-once (`distributed-reliability` idempotent-consumer pattern).
@@ -39,7 +39,7 @@ Separate **billing state** (provider's domain: subscriptions, invoices, payment 
 
 ## Decision 5: Failed payments — dunning
 
-Involuntary churn (expired/declined cards) is silent revenue loss; the recovery machinery ([dunning guides](https://baremetrics.com/blog/dunning-management)):
+Involuntary churn (expired/declined cards) is silent revenue loss; the recovery machinery:
 
 - **Use the provider's smart retries** (ML-timed, decline-code-aware) over any hand-rolled schedule.
 - **Grace period, not cliff:** `past_due` keeps access for ~7–14 days while retries and emails run; degrade before you cut off.
@@ -75,10 +75,3 @@ Involuntary churn (expired/declined cards) is silent revenue loss; the recovery 
 - Editing historical invoices/charges in place
 - Custom card forms "for the design" without noticing the PCI tier change
 - Multi-provider abstraction before a second provider exists
-
-## Sources
-
-- [Stripe: Using webhooks with subscriptions](https://docs.stripe.com/billing/subscriptions/webhooks) · [Stripe webhooks](https://docs.stripe.com/webhooks) · [How subscriptions work](https://docs.stripe.com/billing/subscriptions/overview)
-- [Stripe: PCI compliance guide](https://stripe.com/guides/pci-compliance) · [SAQ-A vs A-EP scope with Stripe](https://cside.com/blog/can-you-use-stripe-for-pci-dss)
-- [Stripe webhooks end-to-end: signatures, idempotency, replay](https://appycodes.dev/blog/stripe-webhooks-end-to-end-2026/) · [Subscription webhooks that survive the edge cases](https://amplifiedcreations.com/journal/stripe-subscription-webhooks)
-- [Dunning management guide — Baremetrics](https://baremetrics.com/blog/dunning-management) · [Involuntary churn & failed payments](https://dodopayments.com/blogs/involuntary-churn-failed-payments)

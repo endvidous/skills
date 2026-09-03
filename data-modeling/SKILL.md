@@ -1,6 +1,6 @@
 ---
 name: data-modeling
-description: Use when designing or modifying database schemas, tables, columns, indexes, constraints, or writing/reviewing migrations — raw SQL, Prisma, or any ORM. Covers primary-key choice (bigint vs UUIDv4 vs UUIDv7), normalization, soft delete, state modeling, JSONB, uniqueness races, transaction isolation, indexing rules, keyset pagination, multi-tenancy, and the expand/contract zero-downtime migration playbook. Also fires for slow-query fixes and lock-related migration incidents.
+description: Use when designing or modifying database schemas, tables, columns, indexes, constraints, or writing/reviewing migrations — raw SQL, Prisma, or any ORM. Also fires for slow-query fixes and lock-related migration incidents.
 ---
 
 # Data Modeling & Migrations
@@ -11,8 +11,8 @@ The schema outlives the code that created it. Every shortcut here is permanent i
 
 **Options and trade-offs:**
 - **bigint identity** — compact (8 bytes), append-ordered (B-tree friendly), human-readable. Costs: generated only at the DB (no client-side ID creation), enumerable — leaks volume and enables IDOR-style scraping if exposed.
-- **UUIDv4** — generate anywhere, non-enumerable. Cost: fully random values insert into arbitrary B-tree positions, causing page splits, index bloat, write amplification, and cold caches. Benchmarks: a 50M-row bulk insert took ~20 min with v4 vs ~1.8 min with v7, with ~25% larger indexes ([mblum.me pg benchmark](https://mblum.me/posts/pg-uuidv7-benchmark/); corroborated by [Umang Sinha's v4/v7 benchmark](https://www.umangsinha.in/blog/postgresql-uuid-performance-benchmark)).
-- **UUIDv7 (default for new distributed-ish systems)** — 48-bit timestamp prefix makes inserts append-ordered like a bigint while keeping 128-bit global uniqueness and client-side generation; native `uuidv7()` in PostgreSQL 18 ([Better Stack guide](https://betterstack.com/community/guides/databases/postgresql-18-uuid/)). Residual cost: 16 bytes; timestamp prefix leaks creation time (rarely matters).
+- **UUIDv4** — generate anywhere, non-enumerable. Cost: fully random values insert into arbitrary B-tree positions, causing page splits, index bloat, write amplification, and cold caches. Benchmarks: a 50M-row bulk insert took ~20 min with v4 vs ~1.8 min with v7, with ~25% larger indexes.
+- **UUIDv7 (default for new distributed-ish systems)** — 48-bit timestamp prefix makes inserts append-ordered like a bigint while keeping 128-bit global uniqueness and client-side generation; native `uuidv7()` in PostgreSQL 18. Residual cost: 16 bytes; timestamp prefix leaks creation time (rarely matters).
 - **Natural keys (email, username, SKU) as PK — never.** Anything a human chose can change; changing a PK cascades through every FK. Natural keys get `UNIQUE` constraints on a normal column instead.
 
 **Default:** bigint for purely-internal tables in a single-writer system; UUIDv7 when clients generate IDs, rows merge across systems, or IDs are exposed. If you expose bigint IDs publicly, pair them with a separate non-enumerable public identifier.
@@ -57,7 +57,7 @@ Transactions: short, and **never held across a network call, queue publish, or u
 - **Composite order: equality columns first, then the range/sort column.** An index on `(a, b)` serves `a` and `a,b` lookups — not `b` alone.
 - Partial indexes for hot subsets (`WHERE status = 'pending'`); `INCLUDE` (covering) for hot read paths.
 - An unverified index is not an optimization: `EXPLAIN ANALYZE` before and after.
-- **Pagination on growing tables: keyset, not OFFSET.** `WHERE (sort_key, id) > (?, ?) ORDER BY sort_key, id LIMIT n` is constant-cost at any depth and stable under concurrent inserts, while OFFSET reads-and-discards all preceding rows and drifts ([use-the-index-luke.com/no-offset — Markus Winand](https://use-the-index-luke.com/no-offset); [Pagination done the PostgreSQL way](https://use-the-index-luke.com/blog/2013-07/pagination-done-the-postgresql-way)). This is the query layer beneath cursor pagination in the `api-contracts` skill.
+- **Pagination on growing tables: keyset, not OFFSET.** `WHERE (sort_key, id) > (?, ?) ORDER BY sort_key, id LIMIT n` is constant-cost at any depth and stable under concurrent inserts, while OFFSET reads-and-discards all preceding rows and drifts. This is the query layer beneath cursor pagination in the `api-contracts` skill.
 
 ## Decision 8: Multi-tenancy (a one-way door — decide before table #2)
 
@@ -69,7 +69,7 @@ Retrofitting tenancy is among the most painful migrations that exist — this de
 
 ## Migrations — expand/contract, always
 
-The governing pattern is Fowler's **ParallelChange (expand/contract)**: break every breaking change into expand → migrate → contract so no consumer must switch at the same instant ([martinfowler.com/bliki/ParallelChange.html](https://martinfowler.com/bliki/ParallelChange.html)). For schemas, app versions N and N−1 run against every intermediate state:
+The governing pattern is Fowler's **ParallelChange (expand/contract)**: break every breaking change into expand → migrate → contract so no consumer must switch at the same instant. For schemas, app versions N and N−1 run against every intermediate state:
 
 1. **Expand** — add new nullable column/table/index. No drops, no renames.
 2. **Dual-write** old + new from the app.
@@ -79,9 +79,9 @@ The governing pattern is Fowler's **ParallelChange (expand/contract)**: break ev
 6. **Contract** — drop old, one bake period later, in its own deploy.
 
 **Lock mechanics (Postgres) — the part that causes outages:**
-- `ALTER TABLE` takes `ACCESS EXCLUSIVE`. The danger is the *queue*, not the duration: your ALTER waits behind one long-running query, and every subsequent query queues behind your ALTER until the pool exhausts ([GoCardless: Zero-downtime Postgres migrations — the hard parts](https://gocardless.com/blog/zero-downtime-postgres-migrations-the-hard-parts)).
-- Therefore: **set `lock_timeout` (e.g. 1–2s) on every DDL statement and retry on failure** — aborting a deploy beats taking the app down ([postgres.ai: lock_timeout and retries](https://postgres.ai/blog/20210923-zero-downtime-postgres-schema-migrations-lock-timeout-and-retries)).
-- Indexes on live tables: `CREATE INDEX CONCURRENTLY` — no write-blocking, but it can't run inside a transaction and a failed run leaves an `INVALID` index to drop and rebuild ([Postgres docs: CREATE INDEX](https://www.postgresql.org/docs/current/sql-createindex.html)).
+- `ALTER TABLE` takes `ACCESS EXCLUSIVE`. The danger is the *queue*, not the duration: your ALTER waits behind one long-running query, and every subsequent query queues behind your ALTER until the pool exhausts.
+- Therefore: **set `lock_timeout` (e.g. 1–2s) on every DDL statement and retry on failure** — aborting a deploy beats taking the app down.
+- Indexes on live tables: `CREATE INDEX CONCURRENTLY` — no write-blocking, but it can't run inside a transaction and a failed run leaves an `INVALID` index to drop and rebuild.
 - Constraints on existing tables: add as `NOT VALID` (brief lock), then `VALIDATE CONSTRAINT` separately (weaker `SHARE UPDATE EXCLUSIVE` lock, scans without blocking writes). Same staging for `NOT NULL`: nullable → backfill → constraint.
 - Never rename or change a column type in place on a hot table — both are expand/contract sequences.
 - The destructive step never ships in the same deploy as the code that stops needing it; every migration is reversible or its PR explicitly marks the point of no return.
@@ -110,12 +110,3 @@ Any table that only grows (events, logs, audit, notifications) gets a retention/
 - JSON columns queried in every `WHERE`
 - One-shot full-table `UPDATE` backfills; renames in place; DDL without `lock_timeout`
 - `COUNT(*)` on unbounded tables in the request path; OFFSET pagination on growing data
-
-## Sources
-
-- [ParallelChange (expand/contract) — Martin Fowler](https://martinfowler.com/bliki/ParallelChange.html)
-- [Zero-downtime Postgres migrations: the hard parts — GoCardless](https://gocardless.com/blog/zero-downtime-postgres-migrations-the-hard-parts)
-- [Zero-downtime schema migrations need lock_timeout and retries — postgres.ai](https://postgres.ai/blog/20210923-zero-downtime-postgres-schema-migrations-lock-timeout-and-retries)
-- [PostgreSQL docs: CREATE INDEX (CONCURRENTLY semantics)](https://www.postgresql.org/docs/current/sql-createindex.html)
-- [UUIDv4 vs UUIDv7 PK benchmark, 50M rows — mblum.me](https://mblum.me/posts/pg-uuidv7-benchmark/) · [PostgreSQL UUID performance benchmark — Umang Sinha](https://www.umangsinha.in/blog/postgresql-uuid-performance-benchmark) · [UUIDv7 in PostgreSQL 18 — Better Stack](https://betterstack.com/community/guides/databases/postgresql-18-uuid/)
-- [No OFFSET: keyset pagination — Markus Winand, use-the-index-luke.com](https://use-the-index-luke.com/no-offset) · [Pagination done the PostgreSQL way](https://use-the-index-luke.com/blog/2013-07/pagination-done-the-postgresql-way)

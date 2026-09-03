@@ -1,11 +1,11 @@
 ---
 name: llm-app-architecture
-description: Use when designing or reviewing any LLM-powered feature or system — chatbots, RAG pipelines, agents, tool use, multi-agent systems, summarization/extraction/classification pipelines, or AI workflow automation. Forces the single-call vs workflow vs agent decision, RAG vs long-context vs fine-tuning choice, retrieval design, tool-surface design, context management for long-running agents, and prompt-injection trust boundaries. Provider-agnostic; fires whenever "add AI/LLM" appears in a task.
+description: Use when designing or reviewing any LLM-powered feature or system — chatbots, RAG pipelines, agents, tool use, multi-agent systems, summarization/extraction/classification pipelines, or AI workflow automation. Provider-agnostic; fires whenever "add AI/LLM" appears in a task.
 ---
 
 # LLM Application Architecture
 
-The governing rule, from Anthropic's [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents): **find the simplest solution possible, and only increase complexity when demonstrably needed**. Most "agent" requests are a single prompt; most "multi-agent" requests are a workflow. Every tier you add costs latency, money, and debuggability.
+The governing rule, from Anthropic's Building Effective Agents: **find the simplest solution possible, and only increase complexity when demonstrably needed**. Most "agent" requests are a single prompt; most "multi-agent" requests are a workflow. Every tier you add costs latency, money, and debuggability.
 
 ## Decision 1: Single call vs workflow vs agent
 
@@ -23,7 +23,7 @@ Any "no" → drop a tier.
 
 ## Decision 2: Which workflow pattern
 
-From [Building Effective Agents](https://www.anthropic.com/research/building-effective-agents) — pick by task shape, not preference:
+From Building Effective Agents — pick by task shape, not preference:
 
 | Pattern | Shape of the task | Cost |
 |---|---|---|
@@ -39,7 +39,7 @@ Default: chaining or routing. Orchestrator–workers is the last workflow stop b
 
 **Options:** stuff it in the context vs RAG vs fine-tuning.
 
-- **Long context / prompt stuffing (default when the corpus fits)** — simplest, no infra, and with prompt caching the repeated-context cost drops ~90% (see `llm-cost-latency`). Caveats: cost scales per request with corpus size, and retrieval quality inside long contexts is position-dependent — models retrieve worst from the *middle* of long contexts ([Lost in the Middle, Liu et al., TACL 2024](https://aclanthology.org/2024.tacl-1.9.pdf)); put critical material at the start or end.
+- **Long context / prompt stuffing (default when the corpus fits)** — simplest, no infra, and with prompt caching the repeated-context cost drops ~90% (see `llm-cost-latency`). Caveats: cost scales per request with corpus size, and retrieval quality inside long contexts is position-dependent — models retrieve worst from the *middle* of long contexts (Lost in the Middle, Liu et al., TACL 2024); put critical material at the start or end.
 - **RAG** — when the corpus is too large, changes frequently, or needs per-user permissioning. You take on a retrieval-quality problem: the model can't cite what retrieval didn't fetch. See Decision 4.
 - **Fine-tuning** — for *style, format, and task behavior*, not knowledge injection. Facts in weights go stale and can't be permissioned or audited; fine-tuning also loses to RAG on freshness. Choose it when few-shot prompting can't hit the required output distribution and you have hundreds+ of quality examples.
 
@@ -47,7 +47,7 @@ These compose: RAG for facts + prompting/fine-tune for behavior is normal.
 
 ## Decision 4: Retrieval design (when RAG won)
 
-Naive vector-only RAG is the baseline everyone outgrows. The measured upgrade path ([Anthropic: Contextual Retrieval](https://www.anthropic.com/engineering/contextual-retrieval)):
+Naive vector-only RAG is the baseline everyone outgrows. The measured upgrade path (Anthropic's Contextual Retrieval):
 
 1. **Hybrid search** — embeddings *and* BM25, rank-fused. Embeddings miss exact identifiers (error codes, SKUs, function names); BM25 misses paraphrase. Together they cover each other.
 2. **Contextual chunks** — prepend a short generated summary situating each chunk in its document before embedding/indexing; contextual embeddings alone cut retrieval failures by 35%.
@@ -64,7 +64,7 @@ Rules: evaluate retrieval separately from generation (recall@k on a labeled set 
 
 ## Decision 6: Single agent vs multi-agent
 
-**Default: one agent.** Multi-agent is a specific tool, not a maturity level. Anthropic's research system found a multi-agent setup outperformed single-agent by 90.2% on *breadth-first, parallelizable research* — while consuming ~15× the tokens of a chat interaction ([How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)).
+**Default: one agent.** Multi-agent is a specific tool, not a maturity level. Anthropic's research system found a multi-agent setup outperformed single-agent by 90.2% on *breadth-first, parallelizable research* — while consuming ~15× the tokens of a chat interaction.
 
 Choose multi-agent when: subtasks are genuinely parallel and independent (fan-out reads, per-item processing), or context isolation is the point (each worker gets a clean window for its slice). Avoid when subtasks share state or need tight coordination — agents can't cheaply share context mid-flight, and coordination bugs dominate. One level of delegation; deeper hierarchies are undebuggable.
 
@@ -83,7 +83,7 @@ When downstream code parses the response, constrain it — schema-enforced struc
 
 ## Trust boundaries (prompt injection)
 
-Prompt injection is the #1 LLM application risk ([OWASP LLM01](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)), and the dangerous variant is **indirect**: instructions hidden in content the model reads — web pages, retrieved documents, emails, tickets, tool outputs.
+Prompt injection is the #1 LLM application risk (OWASP LLM01), and the dangerous variant is **indirect**: instructions hidden in content the model reads — web pages, retrieved documents, emails, tickets, tool outputs.
 
 - Everything retrieved or tool-returned is **data, not instructions** — delimit it, and never grant it operator authority.
 - Design for the model being compromised: **least-privilege tools** (the injection can only do what the tools allow), no secrets in prompts, human confirmation on irreversible/outward-facing actions.
@@ -111,12 +111,3 @@ Prompt injection is the #1 LLM application risk ([OWASP LLM01](https://genai.owa
 - Giant flat tool lists; tool descriptions without trigger conditions
 - Retrieved content concatenated into the prompt with operator-level authority
 - "It works on my three test prompts" as the ship criterion
-
-## Sources
-
-- [Building Effective Agents — Anthropic](https://www.anthropic.com/research/building-effective-agents)
-- [Contextual Retrieval — Anthropic Engineering](https://www.anthropic.com/engineering/contextual-retrieval)
-- [How we built our multi-agent research system — Anthropic Engineering](https://www.anthropic.com/engineering/multi-agent-research-system)
-- [Lost in the Middle: How Language Models Use Long Contexts — Liu et al., TACL 2024](https://aclanthology.org/2024.tacl-1.9.pdf)
-- [OWASP GenAI: LLM01 Prompt Injection](https://genai.owasp.org/llmrisk/llm01-prompt-injection/)
-- [Patterns for Building LLM-based Systems & Products — Eugene Yan](https://eugeneyan.com/writing/llm-patterns/)

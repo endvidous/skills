@@ -1,6 +1,6 @@
 ---
 name: design-taste
-description: Use for any frontend visual/UI design work — building new pages or components, redesigning existing ones, or critiquing a design for quality. Covers typography, color, layout, motion, anti-AI-slop discipline, production hardening, copy, and design-system selection.
+description: Use for any frontend visual/UI design work — building new pages or components, redesigning existing ones, or critiquing a design for quality.
 metadata:
   type: design
 ---

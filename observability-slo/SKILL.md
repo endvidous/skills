@@ -1,6 +1,6 @@
 ---
 name: observability-slo
-description: Use when adding monitoring, metrics, logging, tracing, dashboards, or alerts; when defining SLIs/SLOs or error budgets; when reviewing whether a new feature or service is production-ready; or when on-call pain (noisy alerts, undebuggable incidents) comes up. Covers golden signals / RED / USE, SLO and error-budget design, burn-rate alerting, structured logging vs metrics vs traces, and the instrument-before-ship checklist.
+description: Use when adding monitoring, metrics, logging, tracing, dashboards, or alerts; when defining SLIs/SLOs or error budgets; when reviewing whether a new feature or service is production-ready; or when on-call pain (noisy alerts, undebuggable incidents) comes up.
 ---
 
 # Observability & SLOs
@@ -9,22 +9,22 @@ A feature without instrumentation isn't done — it's deployed, which is differe
 
 ## Decision 1: What to measure
 
-- **Request-driven services → the four golden signals** ([Google SRE book: Monitoring Distributed Systems](https://sre.google/sre-book/monitoring-distributed-systems/)): **latency** (successful and failed requests measured *separately* — fast 500s poison a blended average), **traffic** (demand), **errors** (rate of failed requests), **saturation** (how full; p99 latency over a small window is the early-warning proxy). The equivalent per-endpoint formulation is **RED** — Rate, Errors, Duration ([Tom Wilkie](https://grafana.com/blog/the-red-method-how-to-instrument-your-services/)).
-- **Resources (hosts, pools, queues, DBs) → USE** — Utilization, Saturation, Errors ([Brendan Gregg](https://pagertree.com/learn/devops/what-is-observability/use-and-red-method)). RED for what the service does, USE for what it runs on; connection pools and queues are resources — instrument their saturation (see `distributed-reliability` on bounded queues).
+- **Request-driven services → the four golden signals** (Google SRE book: Monitoring Distributed Systems): **latency** (successful and failed requests measured *separately* — fast 500s poison a blended average), **traffic** (demand), **errors** (rate of failed requests), **saturation** (how full; p99 latency over a small window is the early-warning proxy). The equivalent per-endpoint formulation is **RED** — Rate, Errors, Duration (Tom Wilkie).
+- **Resources (hosts, pools, queues, DBs) → USE** — Utilization, Saturation, Errors (Brendan Gregg). RED for what the service does, USE for what it runs on; connection pools and queues are resources — instrument their saturation (see `distributed-reliability` on bounded queues).
 - Every metric with a latency/duration dimension is recorded as a **histogram/percentiles — never a mean**. Mean latency is a number nobody experiences; p50/p95/p99 are; tail latency is where incidents live.
 - Instrument at the *edge the user experiences* (load balancer / API gateway), not just inside the service — the difference is queueing and network you'd otherwise never see.
 
 ## Decision 2: SLOs and error budgets
 
-- **SLI:** a measured indicator that tracks user experience — "fraction of requests served successfully in < 400ms at the LB" beats any CPU graph ([SRE book: Service Level Objectives](https://sre.google/sre-book/service-level-objectives/)).
+- **SLI:** a measured indicator that tracks user experience — "fraction of requests served successfully in < 400ms at the LB" beats any CPU graph (SRE book: Service Level Objectives).
 - **SLO:** the target over a window (e.g. 99.9% over 28 days). **Not 100%** — 100% is wrong as a target because the marginal cost explodes and users can't tell past a point; the gap is the point.
-- **Error budget = 1 − SLO.** 99.9% over 1M requests = 1,000 allowed failures. The budget converts reliability into a spendable resource: budget available → ship features and take risk; budget exhausted → reliability work takes priority over launches ([SRE Workbook: Error Budget Policy](https://sre.google/workbook/error-budget-policy/)). Write the policy *before* the first breach, or the first breach becomes a negotiation.
+- **Error budget = 1 − SLO.** 99.9% over 1M requests = 1,000 allowed failures. The budget converts reliability into a spendable resource: budget available → ship features and take risk; budget exhausted → reliability work takes priority over launches (SRE Workbook: Error Budget Policy). Write the policy *before* the first breach, or the first breach becomes a negotiation.
 - Start with 2–3 SLOs per service (availability + latency, maybe freshness for pipelines). Ten SLOs = zero SLOs.
 
 ## Decision 3: Alerting
 
-- **Symptoms, not causes.** Page on "users are experiencing errors/slowness" (SLI degradation), not "CPU is high" or "disk 80%" — causes without user impact are tickets, not pages ([SRE book](https://sre.google/sre-book/monitoring-distributed-systems/)).
-- **Default mechanism: error-budget burn rate, multi-window.** Alert when the budget is being consumed abnormally fast — fast-burn (e.g. 1h window) pages, slow-burn (6h/3d) tickets. This is the SRE Workbook's recommended endpoint of the alerting maturity ladder ([Alerting on SLOs](https://sre.google/workbook/alerting-on-slos/)); it inherently trades off precision vs recall better than static thresholds.
+- **Symptoms, not causes.** Page on "users are experiencing errors/slowness" (SLI degradation), not "CPU is high" or "disk 80%" — causes without user impact are tickets, not pages (SRE book).
+- **Default mechanism: error-budget burn rate, multi-window.** Alert when the budget is being consumed abnormally fast — fast-burn (e.g. 1h window) pages, slow-burn (6h/3d) tickets. This is the SRE Workbook's recommended endpoint of the alerting maturity ladder (Alerting on SLOs); it inherently trades off precision vs recall better than static thresholds.
 - **Every page is actionable.** If the response is "acknowledge and go back to sleep," delete or demote the alert — alert fatigue is how the real incident gets ignored.
 - Health checks and alerts report **own-service** symptoms; a dependency's outage should page the dependency's owner, and your service degrades gracefully instead of cascading (see `distributed-reliability` Decision 7).
 
@@ -61,12 +61,3 @@ Business-level counters (orders placed, exports generated) sit beside system met
 - Health checks that ping dependencies (cascade restarts — `distributed-reliability`)
 - Instrumenting only after the first production incident
 - Ten dashboards nobody opens instead of one per service that answers the golden signals
-
-## Sources
-
-- [Monitoring Distributed Systems (golden signals) — Google SRE book](https://sre.google/sre-book/monitoring-distributed-systems/)
-- [Service Level Objectives — Google SRE book](https://sre.google/sre-book/service-level-objectives/) · [Implementing SLOs — SRE Workbook](https://sre.google/workbook/implementing-slos/)
-- [Alerting on SLOs (multi-window burn rate) — SRE Workbook](https://sre.google/workbook/alerting-on-slos/) · [Error Budget Policy](https://sre.google/workbook/error-budget-policy/)
-- [The RED Method — Tom Wilkie, Grafana Labs](https://grafana.com/blog/the-red-method-how-to-instrument-your-services/)
-- [USE and RED methods overview (Brendan Gregg's USE)](https://pagertree.com/learn/devops/what-is-observability/use-and-red-method)
-- [OpenTelemetry](https://opentelemetry.io/)

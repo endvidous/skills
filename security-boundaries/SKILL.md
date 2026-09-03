@@ -1,16 +1,16 @@
 ---
 name: security-boundaries
-description: Use when designing or reviewing authentication, authorization, sessions, JWTs, API keys, multi-tenant data isolation, secrets handling, password storage, file uploads, or any endpoint that touches user data — and when reviewing diffs that add endpoints, queries, or user-controlled input. Covers trust-boundary placement, object-level access control (IDOR), token design, tenant isolation, and input/output handling. Not a substitute for a professional audit on high-stakes systems.
+description: Use when designing or reviewing authentication, authorization, sessions, JWTs, API keys, multi-tenant data isolation, secrets handling, password storage, file uploads, or any endpoint that touches user data — and when reviewing diffs that add endpoints, queries, or user-controlled input. Not a substitute for a professional audit on high-stakes systems.
 ---
 
 # Security Boundaries
 
-Three principles generate almost every rule here: **validate at the trust boundary, trust inside** (know where the boundary is); **least privilege** (a compromised component can only do what it was allowed to); **defense in depth** (one broken check ≠ breach). The empirical priority is set by [OWASP Top 10 2021](https://owasp.org/Top10/2021/A01_2021-Broken_Access_Control/): **Broken Access Control is #1**, found in 94% of tested applications — authorization mistakes, not exotic crypto, are where real systems bleed.
+Three principles generate almost every rule here: **validate at the trust boundary, trust inside** (know where the boundary is); **least privilege** (a compromised component can only do what it was allowed to); **defense in depth** (one broken check ≠ breach). The empirical priority is set by OWASP Top 10 2021: **Broken Access Control is #1**, found in 94% of tested applications — authorization mistakes, not exotic crypto, are where real systems bleed.
 
 ## Decision 1: Authorization — the highest-yield section
 
 - **AuthN ≠ AuthZ.** Authentication says who; authorization says whether *this* user may do *this* to *this object*. Most breaches are authz, not authn.
-- **Object-level checks on every access (the IDOR rule).** "User is logged in" plus "record exists" is not authorization — verify the requester owns or may access *that specific object* ([OWASP: IDOR](https://owasp.org/www-community/attacks/insecure_direct_object_reference)). The classic failure: `GET /invoices/12345` returning another tenant's invoice because only login was checked.
+- **Object-level checks on every access (the IDOR rule).** "User is logged in" plus "record exists" is not authorization — verify the requester owns or may access *that specific object* (OWASP: IDOR). The classic failure: `GET /invoices/12345` returning another tenant's invoice because only login was checked.
 - **Deny by default.** Access requires an explicit grant; a route with no policy attached fails closed, not open.
 - **Centralize enforcement** in middleware/guards/a policy layer — per-handler ad-hoc checks guarantee the one forgotten endpoint, and access control "requires correct logic at every endpoint; one missed check is a vulnerability."
 - **Server-side only.** UI hiding is UX, not security; every check the client performs is re-performed on the server. Never accept identity or role fields from the request body — derive them from the authenticated session.
@@ -22,7 +22,7 @@ Three principles generate almost every rule here: **validate at the trust bounda
 - **Server-side sessions (default for first-party web apps)** — opaque cookie ID, state on the server. Instantly revocable, small, no crypto to misconfigure. Cookies get `HttpOnly; Secure; SameSite` + CSRF protection for state-changing requests.
 - **JWTs** — choose for stateless service-to-service auth or third-party API access, accepting the cost: **a JWT cannot be revoked before expiry**. That forces short access-token lifetimes (minutes) + refresh tokens (revocable, stored server-side), which is a session store with extra steps — so don't pick JWT to "avoid state."
 
-**JWT hard rules** (each maps to a real attack class — [RFC 8725: JWT Best Current Practices](https://www.rfc-editor.org/rfc/rfc8725.html)):
+**JWT hard rules** (each maps to a real attack class — RFC 8725: JWT Best Current Practices):
 - **Pin the accepted algorithms server-side; never read `alg` from the token.** The `alg: none` and RS256→HS256 confusion attacks both exploit trusting the attacker-controlled header.
 - Validate `iss`, `aud`, and `exp` on every verification — a token minted for one service must not authenticate to another (use `typ`/explicit typing against cross-JWT confusion).
 - Signing keys are secrets (Decision 4); asymmetric signing when verifiers shouldn't be able to mint.
@@ -49,7 +49,7 @@ The most expensive class of bug a B2B SaaS can ship is tenant data bleed, and it
 - **Trust boundaries are where validation lives** — user input, external APIs, file uploads, webhook payloads, message queues fed by other systems. Inside the boundary, don't re-validate what the type system and your own code guarantee (validation theater hides the real edges).
 - **Injection is solved by construction, not sanitization:** parameterized queries always (string-built SQL is a finding regardless of escaping); same for shell commands (no string interpolation into `sh -c`), LDAP, XPath.
 - **Output encoding for the destination context** — HTML-escape user content rendered to pages (XSS), including content that round-tripped through your DB or an LLM (model output is untrusted — `llm-app-architecture`).
-- **SSRF:** any user-supplied URL your server fetches gets scheme/host allowlisting and blocked private-range resolution ([OWASP A10](https://owasp.org/Top10/2021/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/)).
+- **SSRF:** any user-supplied URL your server fetches gets scheme/host allowlisting and blocked private-range resolution (OWASP A10).
 - **File uploads:** validate type by content not extension, cap size, store outside the web root under generated names, serve with a content-disposition that prevents execution.
 - Rate-limit authentication endpoints (credential stuffing) and expensive operations; respond identically for "wrong password" and "no such user."
 
@@ -74,10 +74,3 @@ The most expensive class of bug a B2B SaaS can ship is tenant data bleed, and it
 - Frontend-only access control; security by obscurity of IDs (see `data-modeling` on non-enumerable public IDs — helpful, but not authorization)
 - Sanitizing/escaping SQL instead of parameterizing
 - Rolling your own crypto, session tokens, or password reset flows when vetted primitives exist
-
-## Sources
-
-- [OWASP Top 10 2021 — A01 Broken Access Control](https://owasp.org/Top10/2021/A01_2021-Broken_Access_Control/) · [IDOR](https://owasp.org/www-community/attacks/insecure_direct_object_reference) · [IDOR Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html)
-- [RFC 8725 — JSON Web Token Best Current Practices](https://www.rfc-editor.org/rfc/rfc8725.html)
-- [OWASP Cheat Sheet Series](https://cheatsheetseries.owasp.org/) (password storage, session management, authorization)
-- [OWASP A10 — SSRF](https://owasp.org/Top10/2021/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/)

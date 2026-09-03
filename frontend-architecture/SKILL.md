@@ -5,7 +5,7 @@ description: Use when structuring a frontend app or reviewing frontend code for 
 
 # Frontend Architecture
 
-The organizing insight: **server state and client state are different problems**, and most frontend complexity comes from treating one as the other. Data fetched from an API is a *cached snapshot you don't own* — it can be stale the moment it arrives, and the correct operations on it are fetch, cache, invalidate, refetch. Client state (an open modal, a draft, a selection) is *owned* — the correct operations are read and write. A library built for one is the wrong tool for the other ([TkDodo, React Query as a State Manager](https://tkdodo.eu/blog/react-query-as-a-state-manager)).
+The organizing insight: **server state and client state are different problems**, and most frontend complexity comes from treating one as the other. Data fetched from an API is a *cached snapshot you don't own* — it can be stale the moment it arrives, and the correct operations on it are fetch, cache, invalidate, refetch. Client state (an open modal, a draft, a selection) is *owned* — the correct operations are read and write. A library built for one is the wrong tool for the other.
 
 ## Decision 1: Where each piece of state lives
 
@@ -14,14 +14,14 @@ Work down this ladder; state goes at the *first* rung that fits, and the burden 
 1. **URL** — filters, pagination, active tab, selected item, search text. Shareable, bookmarkable, survives refresh, back-button works. The most under-used state location; if a user could plausibly share or bookmark the view, the state belongs here.
 2. **Local component state** (`useState`) — anything one component or a tight parent-child pair owns. Default for UI state; lift only when a real second consumer appears.
 3. **Server-cache layer** (React Query / SWR / RTK Query / Apollo) — *all* data that originates from an API. Owns caching, deduplication, background refetch, invalidation-after-mutation.
-4. **Global client store** (Zustand / Redux / Jotai) — cross-component *client-owned* state with no server representation: editor state, multi-step wizard drafts, UI preferences. After server state moves to rung 3, what's left is "usually very tiny" ([TanStack: does this replace client state?](https://tanstack.com/query/v3/docs/framework/react/guides/does-this-replace-client-state)) — a big global store is usually server state in the wrong place.
+4. **Global client store** (Zustand / Redux / Jotai) — cross-component *client-owned* state with no server representation: editor state, multi-step wizard drafts, UI preferences. After server state moves to rung 3, what's left is "usually very tiny" — a big global store is usually server state in the wrong place.
 
 The one hard rule: **never copy server-cache data into a client store.** The copy immediately stops being invalidated, refetched, or deduped — you've built a second, broken cache. If it needs invalidating after a mutation, it's server state, full stop. (Exception that proves it: genuinely client-heavy apps — visual editors, DAWs — where the document *is* client state between explicit saves.)
 
 ## Decision 2: Data fetching
 
 - **Use a server-cache library, not hand-rolled `useEffect` + `fetch`.** The hand-rolled version silently lacks: request deduplication, caching, race-condition handling on unmount/param-change, retry, and invalidation. Those aren't nice-to-haves; their absence is the bug class.
-- **Kill waterfalls.** Fetch-on-render (component renders → fetches → child renders → fetches…) serializes network round trips down the component tree; each level adds full latency ([Sentry on fetch waterfalls](https://blog.sentry.io/fetch-waterfall-in-react/), [TanStack: Request Waterfalls](https://tanstack.com/query/latest/docs/framework/react/guides/request-waterfalls)). Fixes, in order: parallelize sibling queries (`useQueries`/`Promise.all`); hoist data requirements to the route level (route loaders, `prefetchQuery` on navigation intent) — render-as-you-fetch; restructure the API so one request serves the screen instead of N chained ones (`api-contracts`).
+- **Kill waterfalls.** Fetch-on-render (component renders → fetches → child renders → fetches…) serializes network round trips down the component tree; each level adds full latency. Fixes, in order: parallelize sibling queries (`useQueries`/`Promise.all`); hoist data requirements to the route level (route loaders, `prefetchQuery` on navigation intent) — render-as-you-fetch; restructure the API so one request serves the screen instead of N chained ones (`api-contracts`).
 - **Mutations update the cache through invalidation**, not by hand-patching copies: mutate → `invalidateQueries` → refetch. Optimistic updates are the optimization, applied per-interaction where latency is felt, always with rollback on error.
 - **Query keys are an API — centralize them.** Scattered inline key arrays make invalidation a guessing game; a single keys module (factories per domain) makes "what does this mutation invalidate?" answerable.
 - Never call the client store from inside a fetcher; state updates that react to mutations belong in `onSuccess` at the call site — keeps fetchers pure and cache-replayable.
@@ -38,7 +38,7 @@ Decide per app — and increasingly per *page* — using two questions: **is the
 | **SSR** | Public + dynamic + first-paint-critical: e-commerce listings, feeds, landing pages with user data | A server in the request path — its latency, scaling, and caching are now your problem |
 | **Islands / partial hydration** | Content-heavy pages with small interactive pockets (Astro-style) | Ecosystem/framework constraint |
 
-Default reasoning: lean static (SSG/ISR) as far as content allows, add SSR only where freshness-at-first-paint is proven to matter, keep authenticated app surfaces CSR ([Vercel: choosing a rendering strategy](https://vercel.com/blog/how-to-choose-the-best-rendering-strategy-for-your-app), [patterns.dev](https://www.patterns.dev/), [web.dev: Rendering on the Web](https://web.dev/articles/rendering-on-the-web)). Adopting a full-stack meta-framework for a login-walled dashboard buys the SSR operational burden and returns almost nothing — SEO doesn't exist behind auth.
+Default reasoning: lean static (SSG/ISR) as far as content allows, add SSR only where freshness-at-first-paint is proven to matter, keep authenticated app surfaces CSR. Adopting a full-stack meta-framework for a login-walled dashboard buys the SSR operational burden and returns almost nothing — SEO doesn't exist behind auth.
 
 ## Decision 4: Component structure
 
@@ -81,9 +81,3 @@ Default reasoning: lean static (SSG/ISR) as far as content allows, add SSR only 
 - Forms writing every keystroke to a global store
 - Success-path-only components (no empty, no error, no pending-disable)
 - `components/`, `hooks/`, `utils/` type-buckets as the only structure at scale
-
-## Sources
-
-- [React Query as a State Manager — TkDodo](https://tkdodo.eu/blog/react-query-as-a-state-manager) · [Does React Query replace client state managers? — TanStack](https://tanstack.com/query/v3/docs/framework/react/guides/does-this-replace-client-state)
-- [Request Waterfalls — TanStack Query docs](https://tanstack.com/query/latest/docs/framework/react/guides/request-waterfalls) · [Fetch Waterfall in React — Sentry](https://blog.sentry.io/fetch-waterfall-in-react/) · [How to fetch data in React with performance in mind — Developer Way](https://www.developerway.com/posts/how-to-fetch-data-in-react)
-- [Rendering on the Web — web.dev](https://web.dev/articles/rendering-on-the-web) · [Rendering patterns — patterns.dev](https://www.patterns.dev/) · [How to choose the best rendering strategy — Vercel](https://vercel.com/blog/how-to-choose-the-best-rendering-strategy-for-your-app)

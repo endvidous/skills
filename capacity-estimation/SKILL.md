@@ -1,6 +1,6 @@
 ---
 name: capacity-estimation
-description: Use when sizing a system or component — estimating QPS, storage growth, bandwidth, connection/thread pools, cache sizes, queue throughput, or infrastructure cost — when a design doc needs its "numbers" section, or when someone asks "will this scale?" / "how big should the pool be?". Covers back-of-envelope method, the reference latency numbers, Little's law for concurrency sizing, and peak-vs-average discipline.
+description: Use when sizing a system or component — estimating QPS, storage growth, bandwidth, connection/thread pools, cache sizes, queue throughput, or infrastructure cost — when a design doc needs its "numbers" section, or when someone asks "will this scale?" / "how big should the pool be?".
 ---
 
 # Capacity Estimation
@@ -17,7 +17,7 @@ A design without numbers can't be evaluated (see `arch-design-doc` — the Numbe
 
 ## The reference numbers
 
-The canonical table ("latency numbers every programmer should know," Jeff Dean / Peter Norvig — [interactive version](https://colin-scott.github.io/personal_website/research/interactive_latency.html)); the original figures are dated, so treat as ratios and check [napkin-math (Simon Eskildsen)](https://github.com/sirupsen/napkin-math) for maintained numbers:
+The canonical table ("latency numbers every programmer should know," Jeff Dean / Peter Norvig); the original figures are dated, so treat as ratios and check napkin-math (Simon Eskildsen) for maintained numbers:
 
 | Operation | Order of magnitude |
 |---|---|
@@ -36,7 +36,7 @@ The ratios that decide designs: memory is ~1000× faster than SSD random access;
 
 ## Little's law — the one equation to know
 
-**L = λ × W**: concurrency = arrival rate × time in system ([Little's law](https://en.wikipedia.org/wiki/Little%27s_law)). It holds regardless of arrival or service distributions, which is why it's safe for napkin use.
+**L = λ × W**: concurrency = arrival rate × time in system (Little's law). It holds regardless of arrival or service distributions, which is why it's safe for napkin use.
 
 - **Sizing pools:** 500 RPS at 200ms average latency → 500 × 0.2 = **100 requests in flight**. Thread pools, DB connection pools, and in-flight budgets need headroom above that (say 2×) or any latency blip queues into an outage.
 - **Throughput ceilings:** max sustainable RPS = concurrency limit ÷ latency. 200 concurrency slots at p99 0.4s ≈ 500 RPS ceiling — more throughput requires more slots or *less latency*, not more CPU by itself.
@@ -75,10 +75,3 @@ Export feature: 50K exports/day, ~2 MB each, kept 90 days. QPS: 50K ÷ 100K ≈ 
 - Designing for 100× imagined scale; ignoring 10× real growth
 - Optimizing a component that isn't the bottleneck
 - Treating latency and throughput as independent knobs (Little's law says otherwise)
-
-## Sources
-
-- [Latency numbers every programmer should know — interactive (Colin Scott)](https://colin-scott.github.io/personal_website/research/interactive_latency.html) · [Jeff Dean's "Numbers Everyone Should Know"](https://brenocon.com/dean_perf.html)
-- [napkin-math — Simon Eskildsen](https://github.com/sirupsen/napkin-math)
-- [Little's law — Wikipedia](https://en.wikipedia.org/wiki/Little%27s_law)
-- [Capacity planning with Little's law — worked examples](https://systemdr.systemdrd.com/p/capacity-planning-modeling-using)

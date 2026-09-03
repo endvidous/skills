@@ -27,15 +27,15 @@ Default: HTTP/CDN first for anything public (it's free, standardized infrastruct
 
 ## Decision 3: Read/write pattern
 
-- **Cache-aside (lazy loading) — default.** App checks cache → miss → read source → populate. Simple, transparent, only caches what's read; cost: first-read latency and a stale window after writes ([overview + trade-offs: CodeAhoy](https://codeahoy.com/2017/08/11/caching-strategies-and-how-to-choose-the-right-one/), [Hazelcast](https://hazelcast.com/blog/a-hitchhikers-guide-to-caching-patterns/)).
-- **Read-through / write-through** — the cache layer itself loads/stores. Write-through keeps reads fresh at the cost of write latency (every write pays both systems) and cache pollution with never-read data; still has the dual-write inconsistency problem ([ScyllaDB on the trade-offs](https://www.scylladb.com/2025/09/22/the-latency-vs-complexity-tradeoffs-with-6-caching-strategies/)).
+- **Cache-aside (lazy loading) — default.** App checks cache → miss → read source → populate. Simple, transparent, only caches what's read; cost: first-read latency and a stale window after writes.
+- **Read-through / write-through** — the cache layer itself loads/stores. Write-through keeps reads fresh at the cost of write latency (every write pays both systems) and cache pollution with never-read data; still has the dual-write inconsistency problem.
 - **Write-behind (write-back)** — write to cache, flush to source asynchronously. Fast writes, but the cache holds the only copy during the window: crash = data loss. Only for data you can afford to lose (metrics, counters) — never for records (`data-modeling`).
 
 ## Decision 4: Invalidation
 
 - **TTL on everything, always** — even entries with event-driven invalidation get a TTL. The TTL is the backstop that bounds how long any invalidation bug can persist. Pick it from the business staleness tolerance ("how old may a profile page be? 60s") — not from a habit of `3600`.
-- **Event-driven: invalidate by DELETE, not by SET.** On write, delete the cache key and let the next read repopulate. Writing the new value from the writer races with concurrent readers repopulating from a stale read — the interleaving leaves stale data in the cache *forever* (absent TTL). This stale-set race is real enough that Facebook built **leases** into memcache — a per-key token that rejects sets from readers that lost the race — which also cut stampede-driven DB load from 17K to 1.3K queries/s ([Scaling Memcache at Facebook, NSDI '13](https://www.usenix.org/system/files/conference/nsdi13/nsdi13-final170_update.pdf); [lecture notes](https://timilearning.com/posts/mit-6.824/lecture-16-memcache-at-facebook/)).
-- **Versioned keys** — put a version/updated-at in the key (`user:42:v7` or hash of inputs); writers bump the version, old entries age out via TTL and eviction. No delete fan-out, immune to the stale-set race; cost: you need a cheap way to know the current version, and dead entries occupy memory until evicted. Best when one write invalidates many derived entries ([strategies overview](https://codelit.io/blog/caching-invalidation-strategies)).
+- **Event-driven: invalidate by DELETE, not by SET.** On write, delete the cache key and let the next read repopulate. Writing the new value from the writer races with concurrent readers repopulating from a stale read — the interleaving leaves stale data in the cache *forever* (absent TTL). This stale-set race is real enough that Facebook built **leases** into memcache — a per-key token that rejects sets from readers that lost the race — which also cut stampede-driven DB load from 17K to 1.3K queries/s (Scaling Memcache at Facebook, NSDI '13).
+- **Versioned keys** — put a version/updated-at in the key (`user:42:v7` or hash of inputs); writers bump the version, old entries age out via TTL and eviction. No delete fan-out, immune to the stale-set race; cost: you need a cheap way to know the current version, and dead entries occupy memory until evicted. Best when one write invalidates many derived entries.
 - Deletes/invalidations that must span systems (cache + DB) have the same dual-write problem as any distributed write — if it must be reliable, it goes through the outbox/CDC path (`distributed-reliability` Decision 4), not a best-effort `DEL` after commit.
 
 ## Decision 5: Stampede protection (hot keys)
@@ -43,18 +43,18 @@ Default: HTTP/CDN first for anything public (it's free, standardized infrastruct
 When a popular key expires, every concurrent request misses and hits the source at once — the cache stampede / thundering herd. Defenses, cheapest first:
 
 1. **Jitter TTLs** (`ttl + rand(0, 10%)`) — one line; prevents synchronized expiry of keys populated together (deploys, warmups, midnight crons).
-2. **Request coalescing / singleflight** — at most one in-flight recompute per key per node (Go's `singleflight`, a per-key promise/mutex in Node); distributed variant: a short-TTL lock key (`SET lock:key NX PX`), losers serve stale or wait ([pattern walkthrough](https://oneuptime.com/blog/post/2026-01-30-cache-stampede-prevention/view)).
+2. **Request coalescing / singleflight** — at most one in-flight recompute per key per node (Go's `singleflight`, a per-key promise/mutex in Node); distributed variant: a short-TTL lock key (`SET lock:key NX PX`), losers serve stale or wait.
 3. **Serve-stale (soft TTL)** — store a logical expiry inside the value; after it passes, serve the stale copy and refresh in the background. Smooths the cliff entirely; HTTP's version is `stale-while-revalidate` (Decision 6).
-4. **Probabilistic early expiration** — each request refreshes early with probability rising near expiry (XFetch, [Vattani et al., "Optimal Probabilistic Cache Stampede Prevention"](https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf)) — for the few ultra-hot keys where coalescing alone still leaves a refresh spike.
+4. **Probabilistic early expiration** — each request refreshes early with probability rising near expiry (XFetch; Vattani et al., "Optimal Probabilistic Cache Stampede Prevention") — for the few ultra-hot keys where coalescing alone still leaves a refresh spike.
 
 Default: jitter always; coalescing + serve-stale for known-hot keys. Also protect the *source*: the recompute path needs a concurrency cap so even a defeated defense degrades instead of cascading (`distributed-reliability` Decision 7).
 
 ## Decision 6: HTTP and CDN caching
 
-- **Immutable assets** (content-hashed filenames: `app.3f9a1c.js`): `Cache-Control: public, max-age=31536000, immutable` — the hash in the name *is* the invalidation, `immutable` skips even revalidation ([MDN Cache-Control](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control)).
+- **Immutable assets** (content-hashed filenames: `app.3f9a1c.js`): `Cache-Control: public, max-age=31536000, immutable` — the hash in the name *is* the invalidation, `immutable` skips even revalidation.
 - **HTML / API responses**: default `no-store` for personalized/authenticated responses; `private, no-cache` + `ETag` for per-user content that may revalidate; `public, max-age=<short>, s-maxage=<longer>` for public content — browsers stay fresh, the CDN (which you *can* purge) absorbs the load.
-- **`stale-while-revalidate=N` / `stale-if-error=N`** ([RFC 5861](https://httpwg.org/specs/rfc5861.html)): serve stale during background revalidation / origin failure — the standardized serve-stale pattern, and cheap resilience.
-- `ETag`/`Last-Modified` make expired entries cheap (304, no body) — set them wherever responses are cacheable ([MDN caching guide](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching)).
+- **`stale-while-revalidate=N` / `stale-if-error=N`** (RFC 5861): serve stale during background revalidation / origin failure — the standardized serve-stale pattern, and cheap resilience.
+- `ETag`/`Last-Modified` make expired entries cheap (304, no body) — set them wherever responses are cacheable.
 - Remember the asymmetry: you can purge your CDN; you cannot purge browsers. Long browser TTLs only on content whose *URL changes* when content changes.
 
 ## Decision 7: Operating the cache
@@ -86,11 +86,3 @@ Default: jitter always; coalescing + serve-stale for known-hot keys. Also protec
 - Redis treated as durable storage because it's already there (write-behind for records)
 - `Cache-Control: public` on authenticated responses; long browser TTLs on unversioned URLs
 - One Redis for cache + sessions + queues — one eviction policy can't serve all three
-
-## Sources
-
-- [Scaling Memcache at Facebook (NSDI '13) — leases, stale sets, thundering herds](https://www.usenix.org/system/files/conference/nsdi13/nsdi13-final170_update.pdf)
-- [Optimal Probabilistic Cache Stampede Prevention (XFetch) — Vattani, Chierichetti, Lowenstein](https://cseweb.ucsd.edu/~avattani/papers/cache_stampede.pdf)
-- [Caching Strategies and How to Choose the Right One — CodeAhoy](https://codeahoy.com/2017/08/11/caching-strategies-and-how-to-choose-the-right-one/) · [A Hitchhiker's Guide to Caching Patterns — Hazelcast](https://hazelcast.com/blog/a-hitchhikers-guide-to-caching-patterns/) · [Latency vs. complexity of 6 caching strategies — ScyllaDB](https://www.scylladb.com/2025/09/22/the-latency-vs-complexity-tradeoffs-with-6-caching-strategies/)
-- [HTTP caching — MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Caching) · [Cache-Control — MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Cache-Control) · [RFC 5861 — stale-while-revalidate / stale-if-error](https://httpwg.org/specs/rfc5861.html)
-- [Cache invalidation strategies — Codelit](https://codelit.io/blog/caching-invalidation-strategies) · [Cache stampede prevention patterns — OneUptime](https://oneuptime.com/blog/post/2026-01-30-cache-stampede-prevention/view)

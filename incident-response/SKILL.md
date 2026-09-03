@@ -1,11 +1,11 @@
 ---
 name: incident-response
-description: Use when production is broken or degraded (outage, elevated errors, data issue), when designing an on-call/incident process, severity levels, or runbooks, when writing or reviewing a postmortem, or when debugging a live system under time pressure. Covers mitigate-first discipline, the "what changed?" heuristic, incident roles and communication, severity classification, and blameless postmortems. Complements observability-slo (detection) and migration-playbooks (rollback design).
+description: Use when production is broken or degraded (outage, elevated errors, data issue), when designing an on-call/incident process, severity levels, or runbooks, when writing or reviewing a postmortem, or when debugging a live system under time pressure. Complements observability-slo (detection) and migration-playbooks (rollback design).
 ---
 
 # Incident Response
 
-Two disciplines carry most of the value. **Mitigate first, understand later:** the goal during an incident is to stop user impact, not to find the root cause — rolling back and *then* debugging in calm beats debugging live, and skipping that order adds 90+ minutes to recovery in incidents where rollback was the eventual fix anyway ([Google SRE service best practices](https://sre.google/sre-book/service-best-practices/); [deploy-regression analysis](https://stackgen.com/blog/sre-deploy-induced-regression-failure-mode)). **Blameless afterward:** people acting in good faith on the information they had are never the root cause; systems that let a mistake become an outage are ([SRE postmortem culture](https://sre.google/sre-book/postmortem-culture/)).
+Two disciplines carry most of the value. **Mitigate first, understand later:** the goal during an incident is to stop user impact, not to find the root cause — rolling back and *then* debugging in calm beats debugging live, and skipping that order adds 90+ minutes to recovery in incidents where rollback was the eventual fix anyway. **Blameless afterward:** people acting in good faith on the information they had are never the root cause; systems that let a mistake become an outage are.
 
 ## Decision 1: Severity — decide fast, from user impact
 
@@ -17,7 +17,7 @@ Define levels **before** incidents, by user/business impact with concrete exampl
 | SEV2 | Major feature broken or severe degradation for many | Page now, incident process |
 | SEV3 | Partial/degraded, workaround exists | Business hours, ticket |
 
-Rules from [PagerDuty's response docs](https://response.pagerduty.com/before/severity_levels/): **unsure between two levels → take the higher**; don't litigate severity mid-incident (adjust in review); anyone may declare an incident — a false alarm costs minutes, a delayed declaration costs the MTTR. Detection should come from SLO burn-rate alerts (`observability-slo`), not from a customer tweet.
+Rules from PagerDuty's response docs: **unsure between two levels → take the higher**; don't litigate severity mid-incident (adjust in review); anyone may declare an incident — a false alarm costs minutes, a delayed declaration costs the MTTR. Detection should come from SLO burn-rate alerts (`observability-slo`), not from a customer tweet.
 
 ## Decision 2: First response — the mitigation ladder
 
@@ -33,7 +33,7 @@ Discipline: no untracked changes ("fix attempts" that aren't logged become tomor
 
 ## Decision 3: Roles and communication (beyond ~2 responders)
 
-From Google's IMAG / PagerDuty (both derived from emergency-services ICS — [SRE: Managing Incidents](https://sre.google/sre-book/managing-incidents/)):
+From Google's IMAG / PagerDuty (both derived from emergency-services ICS):
 
 - **Incident Commander** — owns coordination and decisions, **does not touch keyboards to fix things**. The IC debugging is the classic failure: nobody is steering, three people restart the same service.
 - **Ops/subject responders** — hands on the system, report findings to IC.
@@ -43,7 +43,7 @@ From Google's IMAG / PagerDuty (both derived from emergency-services ICS — [SR
 
 ## Decision 4: The postmortem
 
-Every SEV1/SEV2 gets one, written within days, **blameless**, and shared widely — the artifact's purpose is organizational learning, converting one team's outage into everyone's fix ([postmortem culture](https://sre.google/workbook/postmortem-culture/)):
+Every SEV1/SEV2 gets one, written within days, **blameless**, and shared widely — the artifact's purpose is organizational learning, converting one team's outage into everyone's fix:
 
 - Contents: impact (users, duration, SLO budget burned — `observability-slo`), timeline (detection → mitigation → resolution, with the *detection gap* highlighted), contributing causes (plural — "root cause" is usually several conditions aligning), what went well / what didn't, action items.
 - Blameless concretely: "the deploy script allowed a config that fails at runtime" not "X pushed a bad config." Naming-and-shaming teaches people to hide information, which destroys the only mechanism that prevents recurrence. Blameless ≠ consequence-free; it means the analysis targets the system.
@@ -77,10 +77,3 @@ Every SEV1/SEV2 gets one, written within days, **blameless**, and shared widely 
 - Runbooks written during the incident they were needed for
 - Treating a near-miss as a non-event (free lessons, same causes)
 - Hero culture: rewarding 3am saves over the boring work that prevents them
-
-## Sources
-
-- [Managing Incidents — Google SRE book](https://sre.google/sre-book/managing-incidents/) · [Incident management guide — sre.google](https://sre.google/resources/practices-and-processes/incident-management-guide/)
-- [Postmortem Culture: Learning from Failure — SRE book](https://sre.google/sre-book/postmortem-culture/) · [SRE Workbook: Postmortem Culture](https://sre.google/workbook/postmortem-culture/) · [Example postmortem](https://sre.google/sre-book/example-postmortem/)
-- [Severity Levels — PagerDuty Incident Response](https://response.pagerduty.com/before/severity_levels/)
-- [Google SRE: Production services best practices (rollback-first)](https://sre.google/sre-book/service-best-practices/) · [Deploy-induced regression analysis — StackGen](https://stackgen.com/blog/sre-deploy-induced-regression-failure-mode)

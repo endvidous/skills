@@ -1,21 +1,21 @@
 ---
 name: accessibility-engineering
-description: "Use when building or reviewing any UI for accessibility — components, forms, modals, navigation, custom widgets, focus management, keyboard support, ARIA usage, color contrast, screen-reader behavior, or WCAG/EAA/ADA compliance questions. The engineering layer: semantic HTML, keyboard/focus mechanics, ARIA rules, and testing; visual-design skills handle aesthetics. Fires especially on custom interactive components (dropdowns, dialogs, tabs, comboboxes) and SPA route changes."
+description: "Use when building or reviewing any UI for accessibility — components, forms, modals, custom widgets, focus management, keyboard support, ARIA usage, color contrast, screen-reader behavior, or WCAG/EAA/ADA compliance. Not for visual aesthetics. Fires especially on custom interactive components (dropdowns, dialogs, tabs, comboboxes) and SPA route changes."
 ---
 
 # Accessibility Engineering
 
-The compliance floor is **WCAG 2.2 AA** — it's the reference for the European Accessibility Act (in force since June 2025), US ADA case law, and most procurement ([WCAG 2.2](https://www.w3.org/TR/WCAG22/), [EAA overview](https://www.levelaccess.com/compliance-overview/european-accessibility-act-eaa/)). But the engineering rule that prevents the most damage is simpler: **use the platform.** Semantic HTML elements ship with keyboard support, focus behavior, and screen-reader semantics already correct; almost every accessibility bug is a rebuilt platform feature missing half its contract.
+The compliance floor is **WCAG 2.2 AA** — it's the reference for the European Accessibility Act (in force since June 2025), US ADA case law, and most procurement. But the engineering rule that prevents the most damage is simpler: **use the platform.** Semantic HTML elements ship with keyboard support, focus behavior, and screen-reader semantics already correct; almost every accessibility bug is a rebuilt platform feature missing half its contract.
 
 ## Decision 1: Semantic HTML before everything
 
 - `<button>` for actions, `<a href>` for navigation, `<label>` wired to every input, `<select>`/`<input type=...>` before custom widgets, one `<h1>` and a heading hierarchy that doesn't skip levels, landmarks (`<nav>`, `<main>`, `<header>`) for orientation.
 - A `<div onClick>` is not a button: it's missing keyboard activation (Enter/Space), focusability, the accessible role, and announced state — four bugs in one element.
-- Reach for a custom widget only when a native element genuinely can't do the job — and then build it to the [ARIA Authoring Practices Guide](https://www.w3.org/WAI/ARIA/apg/patterns/) pattern (roles + expected _keyboard interaction_, which is the part everyone skips) or, better, use a headless accessible library (Radix/React Aria/Headless UI-class) that has already shipped the keyboard contract.
+- Reach for a custom widget only when a native element genuinely can't do the job — and then build it to the ARIA Authoring Practices Guide pattern (roles + expected _keyboard interaction_, which is the part everyone skips) or, better, use a headless accessible library (Radix/React Aria/Headless UI-class) that has already shipped the keyboard contract.
 
 ## Decision 2: ARIA — less is more, verifiably
 
-The [first rule of ARIA](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA): don't use ARIA if native HTML can do it. This isn't style preference — pages _with_ ARIA average significantly **more** detectable errors than pages without (59.1 vs 42 per page in the [2026 WebAIM Million](https://webaim.org/projects/million/)); bad ARIA actively lies to screen readers, which is worse than silence.
+The first rule of ARIA: don't use ARIA if native HTML can do it. This isn't style preference — pages _with_ ARIA average significantly **more** detectable errors than pages without (59.1 vs 42 per page, per the WebAIM Million 2026 survey); bad ARIA actively lies to screen readers, which is worse than silence.
 
 - ARIA changes _announcements_, never _behavior_ — `role="button"` doesn't add keyboard handling; you still owe the JS.
 - Legitimate uses: state on custom widgets (`aria-expanded`, `aria-selected`, `aria-current`), `aria-label` where visible text is absent (icon buttons), `aria-describedby` for error/help association, `aria-live` for async announcements.
@@ -23,7 +23,7 @@ The [first rule of ARIA](https://developer.mozilla.org/en-US/docs/Web/Accessibil
 
 ## Decision 3: Keyboard and focus — where SPAs fail
 
-Everything a mouse can do, the keyboard must: reachable (Tab), operable (Enter/Space/arrows per APG pattern), escapable (no traps), in a **visible focus indicator** (never `outline: none` without a replacement; WCAG 2.2 adds [Focus Not Obscured](https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/) — sticky headers/footers must not hide the focused element).
+Everything a mouse can do, the keyboard must: reachable (Tab), operable (Enter/Space/arrows per APG pattern), escapable (no traps), in a **visible focus indicator** (never `outline: none` without a replacement; WCAG 2.2 adds Focus Not Obscured — sticky headers/footers must not hide the focused element).
 
 Focus is **managed state** in an SPA (`frontend-architecture`):
 
@@ -36,7 +36,7 @@ Focus is **managed state** in an SPA (`frontend-architecture`):
 
 - Every input has a real `<label>` (placeholder is not a label — it vanishes on input and fails contrast); groups use `<fieldset>`/`<legend>`; correct `type=` and `autocomplete=` (mobile keyboards + WCAG 1.3.5).
 - Errors: identified in _text_ (not color alone), associated via `aria-describedby` + `aria-invalid`, and on failed submit focus moves to the first invalid field or an error summary that links to fields.
-- WCAG 2.2 additions worth designing in: **Target Size** ≥24×24 CSS px for pointer targets, **Redundant Entry** (don't re-ask within a flow), **Accessible Authentication** (no cognitive tests — copy-paste allowed in password fields, no "type the 3rd character") ([new in 2.2](https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/)).
+- WCAG 2.2 additions worth designing in: **Target Size** ≥24×24 CSS px for pointer targets, **Redundant Entry** (don't re-ask within a flow), **Accessible Authentication** (no cognitive tests — copy-paste allowed in password fields, no "type the 3rd character").
 
 ## Decision 5: The visual floor (engineering side)
 
@@ -44,7 +44,7 @@ Contrast ≥4.5:1 normal text, 3:1 large text and UI components — check tokens
 
 ## Decision 6: Testing — automation catches a minority
 
-Automated tools (axe-core) catch roughly **30–57% of issues** ([axe-core](https://github.com/dequelabs/axe-core), [what automation misses](https://testparty.ai/blog/automated-accessibility-testing-guide)) — they verify attributes exist, not that the experience makes sense. Layer:
+Automated tools (axe-core) catch roughly **30–57% of issues** — they verify attributes exist, not that the experience makes sense. Layer:
 
 1. **CI:** axe in component/E2E tests (jest-axe, `@axe-core/playwright`) — zero-violation gate on new code; catches the mechanical 40%.
 2. **Per-feature keyboard pass (the highest-yield manual habit):** unplug the mouse, complete the feature's journey — Tab reachability, visible focus, Escape, no traps. Five minutes, catches most of what axe can't.
@@ -75,11 +75,3 @@ Definition of done for a UI feature includes 1 and 2 — retrofit costs a multip
 - Accessibility as a pre-launch audit line-item instead of a per-PR check
 - Overlay/widget products claiming to "make the site compliant" — they don't, and lawsuits agree
 - Testing only with a mouse, on a 27" monitor, at 100% zoom
-
-## Sources
-
-- [WCAG 2.2 — W3C](https://www.w3.org/TR/WCAG22/) · [What's new in WCAG 2.2 — W3C WAI](https://www.w3.org/WAI/standards-guidelines/wcag/new-in-22/)
-- [ARIA Authoring Practices Guide (APG) — W3C](https://www.w3.org/WAI/ARIA/apg/patterns/) · [ARIA — MDN](https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA)
-- [The WebAIM Million](https://webaim.org/projects/million/) (ARIA-correlates-with-errors data)
-- [axe-core — Deque](https://github.com/dequelabs/axe-core) · [What automated testing catches and misses](https://testparty.ai/blog/automated-accessibility-testing-guide)
-- [European Accessibility Act overview — Level Access](https://www.levelaccess.com/compliance-overview/european-accessibility-act-eaa/)

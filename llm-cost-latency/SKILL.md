@@ -1,6 +1,6 @@
 ---
 name: llm-cost-latency
-description: Use when optimizing LLM API cost or latency, choosing a model tier, setting up prompt caching, batching, streaming, or model routing — or when someone says "the AI feature is too slow" or "the LLM bill is too high". Covers token accounting, the cost-lever ladder (caching → batching → routing → downgrading), prompt-cache prefix discipline, semantic-cache risks, TTFT vs total latency, and reasoning-effort budgets.
+description: Use when optimizing LLM API cost or latency, choosing a model tier, setting up prompt caching, batching, streaming, or model routing — or when someone says "the AI feature is too slow" or "the LLM bill is too high".
 ---
 
 # LLM Cost & Latency
@@ -27,7 +27,7 @@ Downgrading every request to a cheaper model is the *last* lever, not the first 
 
 ## Decision 1: Prompt caching
 
-Provider-side prompt caching is a **prefix match**: cache reads cost ~0.1× the base input price, writes ~1.25× (short TTL) to 2× (long TTL); with a 5-minute-TTL write, the second request already breaks even ([Anthropic prompt caching docs](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)). The discipline that makes it work:
+Provider-side prompt caching is a **prefix match**: cache reads cost ~0.1× the base input price, writes ~1.25× (short TTL) to 2× (long TTL); with a 5-minute-TTL write, the second request already breaks even. The discipline that makes it work:
 
 - **Order by stability:** static system prompt and tool definitions first → per-session context → per-turn content last. Any byte change invalidates everything after it.
 - **Hunt silent invalidators:** a timestamp or UUID interpolated into the system prompt, unsorted JSON serialization, a per-user tool list — each one silently zeroes your hit rate. Verify with the usage fields (`cache_read_input_tokens` > 0), don't assume.
@@ -37,7 +37,7 @@ Provider-side prompt caching is a **prefix match**: cache reads cost ~0.1× the 
 
 ## Decision 2: Batch vs real-time
 
-Ask one question per pipeline: **does a human wait on this response?** If not — nightly enrichment, bulk classification, eval runs, report generation, backfills — the batch endpoint gives a flat **50% discount** with typically-under-an-hour turnaround ([Anthropic Batch API](https://platform.claude.com/docs/en/build-with-claude/batch-processing)). This is the highest-value/lowest-effort lever most teams skip. Mechanics: results return unordered (key by `custom_id`), and batches compose with prompt caching.
+Ask one question per pipeline: **does a human wait on this response?** If not — nightly enrichment, bulk classification, eval runs, report generation, backfills — the batch endpoint gives a flat **50% discount** with typically-under-an-hour turnaround. This is the highest-value/lowest-effort lever most teams skip. Mechanics: results return unordered (key by `custom_id`), and batches compose with prompt caching.
 
 ## Decision 3: Context hygiene
 
@@ -57,7 +57,7 @@ Ask one question per pipeline: **does a human wait on this response?** If not �
 **Options, simplest first:**
 - **One capable model everywhere (default at small scale)** — engineering time is more expensive than tokens until volume says otherwise.
 - **Static per-route assignment (default at scale)** — each pipeline/endpoint gets the cheapest tier that passes its eval suite: cheap model for classification and extraction, mid-tier for user chat, top tier for agentic/complex work. Trivial to implement and reason about; this captures most routing value.
-- **Learned routing / cascades** — a router picks the model per query, or a cheap model answers and escalates on low confidence. The research is real — cascades matched top-model quality at up to 98% lower cost ([FrugalGPT](https://arxiv.org/abs/2305.05176)); learned routers cut cost ~2× at 95% quality ([RouteLLM](https://champaignmagazine.com/2025/10/16/router-r1-and-llm-routing-research/)) — but you inherit a router to train/maintain, added latency on escalation, and quality that varies per query. Adopt only at volumes where the savings pay for that machinery.
+- **Learned routing / cascades** — a router picks the model per query, or a cheap model answers and escalates on low confidence. The research is real — cascades matched top-model quality at up to 98% lower cost (FrugalGPT); learned routers cut cost ~2× at 95% quality (RouteLLM) — but you inherit a router to train/maintain, added latency on escalation, and quality that varies per query. Adopt only at volumes where the savings pay for that machinery.
 
 Hard rule: **a downgrade is only a downgrade if evals prove parity.** "Seems fine" on a cheaper model is how quality quietly erodes — route by measurement (see `llm-evals`).
 
@@ -97,12 +97,3 @@ Watch p95/p99, not means — LLM latency is long-tailed, and retry storms on tim
 - Semantic cache serving stale or wrong-account answers
 - Non-streamed 30-second user-facing generations
 - Latency-driven max-retries-everywhere (see `distributed-reliability` — retries amplify)
-
-## Sources
-
-- [Prompt caching — Anthropic docs](https://platform.claude.com/docs/en/build-with-claude/prompt-caching)
-- [Batch processing — Anthropic docs](https://platform.claude.com/docs/en/build-with-claude/batch-processing)
-- [Pricing — Anthropic docs](https://platform.claude.com/docs/en/pricing) (verify current numbers here)
-- [FrugalGPT: Reducing Cost While Improving Performance — Chen et al.](https://arxiv.org/abs/2305.05176)
-- [RouteLLM and learned-router research overview](https://champaignmagazine.com/2025/10/16/router-r1-and-llm-routing-research/)
-- [Patterns for Building LLM-based Systems (caching, guardrails) — Eugene Yan](https://eugeneyan.com/writing/llm-patterns/)

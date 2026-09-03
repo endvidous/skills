@@ -1,11 +1,11 @@
 ---
 name: web-performance
-description: Use when a site or web app is slow to load or laggy to interact with, when optimizing Core Web Vitals (LCP, INP, CLS), bundle size, images, fonts, or third-party scripts, when setting performance budgets, or when reviewing frontend changes for payload/runtime cost. Covers field-vs-lab measurement, the metric-by-metric playbooks, and CI budget enforcement. Complements frontend-architecture (waterfalls, rendering strategy) and caching-strategy (HTTP caching).
+description: Use when a site or web app is slow to load or laggy to interact with, when optimizing Core Web Vitals (LCP, INP, CLS), bundle size, images, fonts, or third-party scripts, when setting performance budgets, or when reviewing frontend changes for payload/runtime cost. Complements frontend-architecture (waterfalls, rendering strategy) and caching-strategy (HTTP caching).
 ---
 
 # Web Performance
 
-Rule one: **field data over lab data.** Lighthouse and DevTools runs are debugging tools; what users experience is the field distribution, and Google scores the **75th percentile of real visits** (CrUX / your own RUM) — a fast M4 MacBook on fiber tells you nothing about your p75 ([how the thresholds were defined — web.dev](https://web.dev/articles/defining-core-web-vitals-thresholds)). Rule two: performance is a budget, not a project — a one-off "perf sprint" decays in a quarter; a CI budget doesn't.
+Rule one: **field data over lab data.** Lighthouse and DevTools runs are debugging tools; what users experience is the field distribution, and Google scores the **75th percentile of real visits** (CrUX / your own RUM) — a fast M4 MacBook on fiber tells you nothing about your p75. Rule two: performance is a budget, not a project — a one-off "perf sprint" decays in a quarter; a CI budget doesn't.
 
 ## The targets (p75, field)
 
@@ -15,7 +15,7 @@ Rule one: **field data over lab data.** Lighthouse and DevTools runs are debuggi
 | **INP** | ≤ 200ms | Interaction to next paint — runtime responsiveness |
 | **CLS** | ≤ 0.1 | Layout shift — visual stability |
 
-([Core Web Vitals — Google](https://developers.google.com/search/docs/appearance/core-web-vitals)). Beyond SEO, these correlate with conversion/bounce — but measure *your* funnel before promising revenue.
+(Core Web Vitals — Google). Beyond SEO, these correlate with conversion/bounce — but measure *your* funnel before promising revenue.
 
 ## Decision 1: Measure before touching anything
 
@@ -25,11 +25,11 @@ Rule one: **field data over lab data.** Lighthouse and DevTools runs are debuggi
 
 ## Decision 2: LCP — the delivery chain
 
-Work the chain in order; each link gates the next ([Optimize LCP — web.dev](https://web.dev/articles/optimize-lcp)):
+Work the chain in order; each link gates the next (Optimize LCP — web.dev):
 
 1. **TTFB:** slow HTML caps everything — CDN at the edge, cache the HTML where possible (`caching-strategy` Decision 6), fix slow server rendering (`capacity-estimation` for where the time goes).
 2. **Discovery:** the LCP resource must be findable in the initial HTML — an `<img>` in markup, not a CSS background or JS-inserted node discovered after hydration. If it can't be in markup, `<link rel="preload">` it.
-3. **Priority:** `fetchpriority="high"` on the LCP image; never `loading="lazy"` on it (lazy-loading the hero is the classic self-inflicted LCP failure). Lazy-load *below-fold* images only ([MDN: fix image LCP](https://developer.mozilla.org/en-US/blog/fix-image-lcp/)).
+3. **Priority:** `fetchpriority="high"` on the LCP image; never `loading="lazy"` on it (lazy-loading the hero is the classic self-inflicted LCP failure). Lazy-load *below-fold* images only (MDN: fix image LCP).
 4. **Size:** modern formats (AVIF ~50% smaller than JPEG, WebP ~30%) + `srcset`/`sizes` so phones don't download desktop pixels. An image CDN/transform service makes this a URL parameter instead of a build pipeline.
 5. **Render-blocking:** inline critical CSS if measurement says CSS is the gate; `defer` all scripts that don't need to run before paint.
 
@@ -37,7 +37,7 @@ Fonts: `font-display: swap` + preload the one or two critical WOFF2 files + subs
 
 ## Decision 3: INP — the main thread
 
-INP is the expensive one — it's architectural, not asset-shaped ([INP guidance — web.dev](https://web.dev/articles/inp)):
+INP is the expensive one — it's architectural, not asset-shaped (INP guidance — web.dev):
 
 - **Long tasks are the enemy:** any main-thread task >50ms can trap an interaction behind it. Find them in the Performance panel / RUM long-task attribution — profile first, the slow code is never where you think (`capacity-estimation`: find the bottleneck).
 - Break up work: yield to the event loop between chunks (`scheduler.yield()`/`setTimeout` batching); move pure computation to a **Web Worker**; debounce input-driven recomputation.
@@ -51,8 +51,8 @@ The solved metric; it's rules, not investigation: explicit `width`/`height` (or 
 
 ## Decision 5: JavaScript payload
 
-- **Code-split by route** as the default; lazy-load heavy widgets (editor, charts, maps) on interaction or visibility ([reduce JS payloads — web.dev](https://web.dev/articles/reduce-javascript-payloads-with-code-splitting)). Everything in the entry chunk is a tax on every page.
-- Audit before optimizing: bundle analyzer, find the top-10 heaviest deps, then: remove (moment→date-fns/Intl, lodash→native), tree-shake (import specifics, check `sideEffects`), or defer. Dropbox cut 33% largely by deleting and deduplicating, not by clever config ([Dropbox bundle-size writeup](https://dropbox.tech/frontend/how-we-reduced-the-size-of-our-javascript-bundles-by-33-percent)).
+- **Code-split by route** as the default; lazy-load heavy widgets (editor, charts, maps) on interaction or visibility (reduce JS payloads — web.dev). Everything in the entry chunk is a tax on every page.
+- Audit before optimizing: bundle analyzer, find the top-10 heaviest deps, then: remove (moment→date-fns/Intl, lodash→native), tree-shake (import specifics, check `sideEffects`), or defer. Dropbox cut 33% largely by deleting and deduplicating, not by clever config (Dropbox bundle-size writeup).
 - **Third-party scripts are the usual worst offender:** each tag manager addition ships to every user forever. Load them `defer`/after-interaction, use facades for heavy embeds (YouTube, chat widgets), and audit quarterly — marketing tags outlive the campaigns that added them.
 
 ## Decision 6: Budgets in CI
@@ -79,11 +79,3 @@ A budget is a **failing check**, not a wiki page: entry-bundle size limit (e.g. 
 - `useMemo`/`memo` sprinkled by superstition while a 400ms long task sits unprofiled
 - Spinners without reserved space (CLS) or feedback (INP) — the twofer
 - A "performance sprint" with no budget left behind
-
-## Sources
-
-- [Core Web Vitals — Google Search Central](https://developers.google.com/search/docs/appearance/core-web-vitals) · [Defining the thresholds — web.dev](https://web.dev/articles/defining-core-web-vitals-thresholds)
-- [Optimize LCP — web.dev](https://web.dev/articles/optimize-lcp) · [Fix image LCP — MDN](https://developer.mozilla.org/en-US/blog/fix-image-lcp/)
-- [Optimize INP — web.dev](https://web.dev/articles/inp) · [Optimize CLS — web.dev](https://web.dev/articles/optimize-cls)
-- [Reduce JavaScript payloads with code splitting — web.dev](https://web.dev/articles/reduce-javascript-payloads-with-code-splitting) · [How Dropbox cut bundles 33%](https://dropbox.tech/frontend/how-we-reduced-the-size-of-our-javascript-bundles-by-33-percent)
-- [Performance budgets — Calibre](https://calibreapp.com/blog/bundle-size-optimization)

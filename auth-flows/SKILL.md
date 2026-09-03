@@ -1,6 +1,6 @@
 ---
 name: auth-flows
-description: Use when implementing or reviewing authentication flows — signup, login, logout, password reset, email verification, magic links, OAuth/OIDC integration ("login with Google"), SSO, MFA/2FA, passkeys, refresh tokens, or auth for SPAs/mobile apps/APIs. Covers OAuth grant selection (RFC 9700), the BFF pattern for browser apps, NIST password rules, reset-flow safety, and MFA method choice. Complements security-boundaries (authz, token mechanics, session storage).
+description: Use when implementing or reviewing authentication flows — signup, login, logout, password reset, email verification, magic links, OAuth/OIDC integration ("login with Google"), SSO, MFA/2FA, passkeys, refresh tokens, or auth for SPAs/mobile apps/APIs. Complements security-boundaries (authz, token mechanics, session storage).
 ---
 
 # Auth Flows
@@ -15,7 +15,7 @@ The governing rule: **never design a novel auth flow.** Every flow in this file 
 
 ## Decision 2: Which OAuth grant
 
-[RFC 9700 (Best Current Practice for OAuth 2.0 Security, Jan 2025)](https://datatracker.ietf.org/doc/rfc9700/) settles this:
+RFC 9700 (Best Current Practice for OAuth 2.0 Security, Jan 2025) settles this:
 
 | Caller | Grant | Notes |
 |---|---|---|
@@ -29,9 +29,9 @@ Always: exact-match redirect URI registration (no wildcards), `state` parameter 
 
 ## Decision 3: Browser-app architecture — where do tokens live?
 
-The [IETF OAuth for Browser-Based Apps BCP](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-browser-based-apps) ranks three patterns:
+The IETF OAuth for Browser-Based Apps BCP ranks three patterns:
 
-- **BFF (backend-for-frontend) — default for first-party SPAs.** A thin backend is the confidential OAuth client; tokens never reach the browser; the SPA gets only an `HttpOnly; Secure; SameSite` session cookie and the BFF attaches access tokens to proxied API calls. XSS can *use* the session while the tab is open but cannot *exfiltrate* long-lived credentials — that's the whole argument ([Auth0 on BFF](https://auth0.com/blog/the-backend-for-frontend-pattern-bff/)).
+- **BFF (backend-for-frontend) — default for first-party SPAs.** A thin backend is the confidential OAuth client; tokens never reach the browser; the SPA gets only an `HttpOnly; Secure; SameSite` session cookie and the BFF attaches access tokens to proxied API calls. XSS can *use* the session while the tab is open but cannot *exfiltrate* long-lived credentials — that's the whole argument.
 - **Token-mediating backend** — backend acquires tokens, hands the access token (not refresh) to the SPA. Less proxying, weaker: XSS can steal the access token for its lifetime.
 - **Browser-held tokens — last resort** (no backend possible). Then: in-memory only (never `localStorage` — any XSS reads it), short access-token lifetimes, rotated refresh tokens with reuse detection.
 
@@ -39,7 +39,7 @@ If your SPA and API are same-site first-party, the honest simplification is ofte
 
 ## Decision 4: Passwords — signup and login
 
-[NIST SP 800-63B rev 4](https://pages.nist.gov/800-63-4/sp800-63b.html) reversed the folk wisdom; follow it:
+NIST SP 800-63B rev 4 reversed the folk wisdom; follow it:
 
 - **Length over composition:** minimum 15 characters when password-only (8 if paired with MFA), long maximum (64+), allow all printable characters and spaces. Composition rules (must-have-symbol etc.) **SHALL NOT** be imposed — they produce `P@ssw0rd1!`, not entropy.
 - **No periodic rotation** — force a change only on evidence of compromise. Scheduled expiry produces incremented suffixes and helpdesk load, not security.
@@ -49,7 +49,7 @@ If your SPA and API are same-site first-party, the honest simplification is ofte
 
 ## Decision 5: Password reset — the flow attackers try first
 
-The reset flow is an alternate login that skips the password; build it to the [OWASP Forgot Password Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html):
+The reset flow is an alternate login that skips the password; build it to the OWASP Forgot Password Cheat Sheet:
 
 1. Request: uniform response regardless of account existence ("if that address exists, we sent a link"), uniform response *time*, rate-limited per account.
 2. Token: CSPRNG-generated, single-use, expires in minutes-to-an-hour, **stored hashed** (a leaked DB must not yield live reset tokens), bound to the account, delivered by side channel (email link).
@@ -62,7 +62,7 @@ The reset flow is an alternate login that skips the password; build it to the [O
 
 Ranked by what actually resists current attacks — real-time phishing proxies (AitM kits) defeat any factor the user can be tricked into relaying:
 
-1. **Passkeys / WebAuthn (FIDO2)** — phishing-resistant *by construction*: the credential is origin-bound, so a spoofed domain can't complete the ceremony ([NCSC on FIDO2 properties](https://www.ncsc.gov.uk/paper/traditional-user-and-fido2-credentials-personal-use)). Default for new builds; offer as primary or step-up.
+1. **Passkeys / WebAuthn (FIDO2)** — phishing-resistant *by construction*: the credential is origin-bound, so a spoofed domain can't complete the ceremony. Default for new builds; offer as primary or step-up.
 2. **TOTP (authenticator app)** — solid against password reuse and offline attacks, **not** phishing-resistant (a proxy relays the 6 digits in real time). Fine baseline.
 3. **SMS** — weakest: SIM-swap and SS7 attacks, plus phishable. Acceptable only as a transitional/legacy option, never the ceiling for high-value accounts.
 
@@ -99,11 +99,3 @@ Mechanics: recovery codes generated at enrollment (shown once, stored hashed); *
 - Embedded webviews for OAuth on mobile
 - Logout that only clears the cookie; no way to enumerate/revoke a user's sessions
 - Building SAML SSO in-house on a deadline
-
-## Sources
-
-- [RFC 9700 — Best Current Practice for OAuth 2.0 Security](https://datatracker.ietf.org/doc/rfc9700/)
-- [OAuth 2.0 for Browser-Based Applications — IETF BCP draft](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-browser-based-apps) · [The BFF Pattern — Auth0](https://auth0.com/blog/the-backend-for-frontend-pattern-bff/)
-- [NIST SP 800-63B rev 4 — Digital Identity Guidelines: Authentication](https://pages.nist.gov/800-63-4/sp800-63b.html)
-- [Forgot Password Cheat Sheet — OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html) · [Authentication Cheat Sheet — OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html)
-- [FIDO2 vs traditional credentials — UK NCSC](https://www.ncsc.gov.uk/paper/traditional-user-and-fido2-credentials-personal-use)

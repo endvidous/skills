@@ -1,15 +1,15 @@
 ---
 name: arch-design-doc
-description: Use when writing, structuring, or reviewing a design document, RFC, ADR, architecture proposal, or technical plan — or when the user asks "how should we build X" for anything non-trivial. Forces problem-first structure, explicit constraints, real alternatives with trade-off reasoning, failure modes, and rollback plans. Also use when critiquing an existing design or deciding whether a design doc is needed at all.
+description: Use when writing, structuring, or reviewing a design document, RFC, ADR, architecture proposal, or technical plan — or when the user asks "how should we build X" for anything non-trivial. Also use when critiquing an existing design or deciding whether a design doc is needed at all.
 ---
 
 # Architecture Design Docs
 
-A design doc exists to surface a decision and its trade-offs, not to describe a system. If a reviewer can't find what is being decided, what it costs, and how to undo it, the doc has failed regardless of how complete the diagrams are. Google's design-doc culture frames the doc's core value the same way: it documents "the high level implementation strategy and key design decisions with emphasis on the trade-offs that were considered" ([Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/)).
+A design doc exists to surface a decision and its trade-offs, not to describe a system. If a reviewer can't find what is being decided, what it costs, and how to undo it, the doc has failed regardless of how complete the diagrams are. Google's design-doc culture frames the doc's core value the same way: it documents "the high level implementation strategy and key design decisions with emphasis on the trade-offs that were considered."
 
 ## Decision 1: Do you need a doc at all? (size the artifact first)
 
-Classify the decision using Bezos's Type 1 / Type 2 framework ([2015 Amazon shareholder letter](https://www.aboutamazon.com/news/company-news/2016-letter-to-shareholders)): **Type 2 (two-way door)** decisions are reversible — make them quickly with ~70% of the information; **Type 1 (one-way door)** decisions are irreversible or nearly so — these deserve slow, deliberate process. Using Type 1 process on Type 2 decisions produces "slowness, unthoughtful risk aversion, failure to experiment."
+Classify the decision using Bezos's Type 1 / Type 2 framework (2015 Amazon shareholder letter): **Type 2 (two-way door)** decisions are reversible — make them quickly with ~70% of the information; **Type 1 (one-way door)** decisions are irreversible or nearly so — these deserve slow, deliberate process. Using Type 1 process on Type 2 decisions produces "slowness, unthoughtful risk aversion, failure to experiment."
 
 | Situation | Artifact | Why |
 |---|---|---|
@@ -23,8 +23,8 @@ The common one-way doors in application work are: data models, public API shapes
 
 **Options considered:**
 - **Free-form prose** — fast, but lets the author skip the sections that would have exposed the problem (alternatives, failure modes). Google explicitly keeps docs informal but still converges on a standard skeleton because those sections are where review value concentrates.
-- **Heavy template (30+ sections)** — forces completeness but produces fill-in-the-blanks compliance writing nobody reads; violates the "docs must stay small to stay updated" observation from [Nygard's ADR essay](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions).
-- **Minimal forced skeleton (default)** — the sections below, sized to the decision. This matches the common structure at Google: context and scope, goals and non-goals, the design, alternatives considered, cross-cutting concerns ([Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/)).
+- **Heavy template (30+ sections)** — forces completeness but produces fill-in-the-blanks compliance writing nobody reads; violates the "docs must stay small to stay updated" observation from Nygard's ADR essay.
+- **Minimal forced skeleton (default)** — the sections below, sized to the decision. This matches the common structure at Google: context and scope, goals and non-goals, the design, alternatives considered, cross-cutting concerns.
 
 **Mandatory sections, in order — no solution content before section 4:**
 
@@ -40,7 +40,7 @@ The common one-way doors in application work are: data models, public API shapes
 
 ## Decision 3: ADR vs design doc vs neither
 
-Use an **ADR** when the decision is one choice among alternatives (library, pattern, convention) rather than a system design. Nygard's format ([Documenting Architecture Decisions](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions), templates at [adr.github.io](https://adr.github.io/)):
+Use an **ADR** when the decision is one choice among alternatives (library, pattern, convention) rather than a system design. Nygard's format:
 
 ```markdown
 # ADR-NNN: <short noun phrase>
@@ -55,7 +55,7 @@ Hard rules for ADRs: one decision per record; append-only (supersede, never edit
 ## Decision 4: Review process
 
 - **Heavyweight review meeting** — reserve for Type 1 decisions crossing team boundaries.
-- **Async comment thread on the doc (default)** — Google's dominant mode: share the doc, discussion happens in comments ([Design Docs at Google](https://www.industrialempathy.com/posts/design-docs-at-google/)).
+- **Async comment thread on the doc (default)** — Google's dominant mode: share the doc, discussion happens in comments.
 - **No review** — acceptable only for Type 2 decisions inside one team's blast radius.
 
 Review effort scales with reversibility cost, not diff size.
@@ -81,12 +81,3 @@ Review effort scales with reversibility cost, not diff size.
 - **Consensus by vagueness** — a doc so abstract everyone agrees because nothing was decided.
 - **Diagram as failure analysis** — a boxes-and-arrows picture answers none of the down/slow/wrong questions.
 - **Zero-consequence decisions** — a Consequences/trade-offs section listing only upsides.
-
-## Sources
-
-- [Design Docs at Google — Malte Ubl, industrialempathy.com](https://www.industrialempathy.com/posts/design-docs-at-google/)
-- [Documenting Architecture Decisions — Michael Nygard, Cognitect](https://cognitect.com/blog/2011/11/15/documenting-architecture-decisions)
-- [Architecture Decision Records — martinfowler.com bliki](https://martinfowler.com/bliki/ArchitectureDecisionRecord.html) · [adr.github.io](https://adr.github.io/)
-- [Jeff Bezos 2015/2016 shareholder letters — Type 1 / Type 2 decisions](https://www.aboutamazon.com/news/company-news/2016-letter-to-shareholders)
-- [Software Engineering at Google — Documentation chapter](https://abseil.io/resources/swe-book/html/ch10.html)
-- [RFC and design doc examples across companies — Pragmatic Engineer](https://newsletter.pragmaticengineer.com/p/software-engineering-rfc-and-design)
